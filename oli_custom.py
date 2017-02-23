@@ -19,7 +19,7 @@ set_rotamer_search_mode(ROTAMERSEARCHLOWRES)
 #Use ramachandran restraints in real space refinement
 set_refine_ramachandran_angles(1)
 
-#Display probe dots etc as solid, if option to do so available.
+#Display probe dots etc as solid, if option to do so available. 
 try:
   set_display_generic_objects_as_solid(0)
 except NameError:
@@ -28,6 +28,9 @@ except NameError:
 
 #Use finer map sampling
 set_map_sampling_rate(2.0)
+
+#Allow duplicate sequence numbers (otherwise some PDBs won't load)
+allow_duplicate_sequence_numbers()
 
 #When rendering using raster 3D, make waters spherical rather than cross shaped.
 #Would be useful to do this for ions also, but such an option does not exist.
@@ -503,10 +506,20 @@ def open_in_chimera():
       os.remove(check_path2)
     map_list=map_molecule_list()
     mol_list=model_molecule_list()
-    set_graphics_window_size(800,600)
+    disp_mol_list=[]
+    disp_map_list=[]
+    for mol_id in model_molecule_list():
+      if mol_is_displayed(mol_id):
+        disp_mol_list.append(mol_id) 
+    for map_id in map_molecule_list():
+      if map_is_displayed(mol_id):
+        disp_map_list.append(map_id)   
+    print("disp model list",disp_mol_list)
+    print("disp map list",disp_map_list)
+    set_graphics_window_size(1000,1000)
     matrix_list=view_matrix() #9-membered list of rotation matrix elements.
     with open(check_path2,"a") as matrix_file: #Write orientation matrix (specify first pdb as model, then use matrixcopy to apply to all others). Translation vector in last column is 0,0,0 because we will take care of that separately.
-      matrix_file.write("Model {model_id}.0\n".format(model_id=mol_list[0]))
+      matrix_file.write("Model {model_id}.0\n".format(model_id=disp_mol_list[0]))
       matrix_file.write("\t {a} {b} {c} 0.0\n".format(a=matrix_list[0],b=matrix_list[1],c=matrix_list[2]))
       matrix_file.write("\t {a} {b} {c} 0.0\n".format(a=matrix_list[3],b=matrix_list[4],c=matrix_list[5]))
       matrix_file.write("\t {a} {b} {c} 0.0\n".format(a=matrix_list[6],b=matrix_list[7],c=matrix_list[8]))
@@ -520,7 +533,7 @@ def open_in_chimera():
           cmd_file.write("open #{model_id} {mol}\n".format(model_id=model_id,mol=path_to_file)) 
           cmd_file.write("color gold #{model_id}; color byhet #{model_id};  sel #{model_id}; namesel tmp; ~ribbon tmp; ~disp tmp; sel tmp&@CA&protein; repr stick sel; disp sel; sel tmp&~protein; repr stick sel; disp sel;  setattr m stickScale 1.0 tmp;  sel side chain/base.without CA/C1'&tmp; repr stick sel; disp sel; setattr b radius 0.1 sel; color byhet tmp; sel @CA|@CB; namesel tmp2; sel tmp&tmp2; repr stick sel; setattr b radius 0.1 sel; sel @CD,N&:pro&tmp; disp sel; repr stick sel; setattr b radius 0.1 sel; ~sel; disp ~protein\n".format(model_id=model_id)) 
           cmd_file.write("matrixset matrix.txt\n")
-          cmd_file.write("matrixcopy #{mol_id0} #{mol_id}\n".format(mol_id0=mol_list[0],mol_id=model_id))         
+          cmd_file.write("matrixcopy #{mol_id0} #{mol_id}\n".format(mol_id0=disp_mol_list[0],mol_id=model_id))         
       map_id0=mol_id
       for map_id in map_molecule_list():
         if map_is_displayed(map_id):
@@ -535,7 +548,7 @@ def open_in_chimera():
             cmd_file.write("open #{model_id} {diff_map} \n".format(model_id=model_id,diff_map=path_to_file))
             cmd_file.write("volume #{model_id} capfaces false style mesh meshlighting false squaremesh false color \"#08882eefa222\" step 1 ;  sop cap off ;  set depthCue ;  set dcStart 0.2 ;  set dcEnd 1 ;  background solid white ; set showcofr ;  cofr view ;  clip on; volume #{model_id} level -{map_level} color #da1200000000 level {map_level} color #0000bda00000 \n".format(model_id=model_id,map_level=map_level))
             cmd_file.write("matrixset matrix.txt\n")
-            cmd_file.write("matrixcopy #{mol_id0} #{model_id}\n".format(mol_id0=mol_list[0],model_id=model_id))
+            cmd_file.write("matrixcopy #{mol_id0} #{model_id}\n".format(mol_id0=disp_mol_list[0],model_id=model_id))
           else:
             model_id=map_id0+map_id
             if map_id==0:
@@ -546,8 +559,8 @@ def open_in_chimera():
             cmd_file.write("open #{model_id} {map} \n".format(model_id=model_id,map=path_to_file))
             cmd_file.write("volume #{model_id} capfaces false style mesh meshlighting false squaremesh false color \"#08882eefa222\" step 1 ;  sop cap off ;  set depthCue ;  set dcStart 0.2 ;  set dcEnd 1 ;  background solid white ; set showcofr ;  cofr view ;  clip on; volume #{model_id} level {map_level} \n".format(model_id=model_id,map_level=map_level))
             cmd_file.write("matrixset matrix.txt\n")
-            cmd_file.write("matrixcopy #{mol_id0} #{model_id}\n".format(mol_id0=mol_list[0],model_id=model_id))
-      cmd_file.write("~sel; set projection orthographic; cofr {x},{y},{z} coordinatesystem #{mol_id0}; ac mc; center sel; cofr view; clip hither {clipval} fromCenter true; clip yon -{clipval} fromCenter true; cofr sel; clip hither {clipval} fromCenter true; clip yon -{clipval} fromCenter true; cofr view; ~set showcofr; del sel; scale {chimera_scale}; windowsize 1000 1000; ; scene ca_and_sidechains save".format(x=cofr[0],y=cofr[1],z=cofr[2],mol_id0=mol_list[0],chimera_scale=chimera_scale,clipval=chimera_clip_val))
+            cmd_file.write("matrixcopy #{mol_id0} #{model_id}\n".format(mol_id0=disp_mol_list[0],model_id=model_id))
+      cmd_file.write("~sel; set projection orthographic; clip off; cofr {x},{y},{z} coordinatesystem #{mol_id0}; ac mc; center sel; cofr fixed; clip hither {clipval} fromCenter true; clip yon -{clipval} fromCenter true; cofr view; clip on; ~set showcofr; del sel; scale {chimera_scale}; windowsize 1000 1000; scene ca_and_sidechains save; disp; scene all_atoms save; scene ca_and_sidechains reset; windowsize 1000 1000".format(x=cofr[0],y=cofr[1],z=cofr[2],mol_id0=disp_mol_list[0],chimera_scale=chimera_scale,clipval=chimera_clip_val))
       #line above applies translation and scale obtained from coot rotation center and zoom_factor
     chimera_exe=find_exe("chimera")
     info_dialog("Opening in Chimera...\nOrientation should be right but you will probably need to \nadjust the scale and clipping to get the same view as in Coot. \n If you can't see anything, try zooming out.")
@@ -556,7 +569,8 @@ def open_in_chimera():
     info_dialog("Sorry, you need UCSF Chimera installed and accessible from the terminal for this to work!")
 #This works okay, though adjustment of zoom and clipping still not ideal.
 #would it be possible to add a subprocess.communicate() to use Coot as a controller for Chimera?
-
+#Hmmm
+#Doesn't work when attempting to open second set of maps loaded, when first set is undisplayed... Fixed! (I think)
 
 def color_by_cablam2(mol_id):
   if find_exe("phenix.cablam_validate") and find_exe("awk") and find_exe("sed"):
@@ -564,9 +578,9 @@ def color_by_cablam2(mol_id):
     pwd=os.getcwd() #dir where coot was launched
     make_directory_maybe("coot-cablam") #Put coot droppings here
     coot_cablam_path=pwd+"/coot-cablam/"
-    file_name=coot_cablam_path+"mol_{mol_id}.pdb".format(mol_id=mol_id)
+    file_name=molecule_name(mol_id)
     file_name_output=coot_cablam_path+"mol_{mol_id}_cablam_output.txt".format(mol_id=mol_id) #this file will have info on cablam outliers
-    write_pdb_file(mol_id,file_name) # write a copy of the active mol to the cablam dir
+#     write_pdb_file(mol_id,file_name) # write a copy of the active mol to the cablam dir
     p=subprocess.Popen("phenix.cablam_validate {file_name} outlier_cutoff=0.005 | awk '{{FS=\":\"}} {{print $1,$2}}' | sed 's/CaBLAM Outlier/1/g' | sed 's/CaBLAM Disfavored/2/g' | sed 's/CA Geom Outlier/3/g' | sed 's/[0123456789-]/ &/' > {file_name_output}".format(file_name=file_name,file_name_output=file_name_output),shell=True)
     p.communicate() #wait for cablam to finish
     cablam_outlier_list=[]
@@ -593,7 +607,7 @@ def color_by_cablam2(mol_id):
           else:
             cablam_outlier_colour_spec=[([ch_id,resid,ins_id],blank_colour)]
             cablam_outlier_list=cablam_outlier_list+cablam_outlier_colour_spec 
-    os.remove(file_name)
+#     os.remove(file_name)
     os.remove(file_name_output)
     try:
       set_user_defined_atom_colour_by_residue_py(mol_id,cablam_outlier_list)
@@ -610,10 +624,10 @@ def color_by_rama(mol_id):
     pwd=os.getcwd() #dir where coot was launched
     make_directory_maybe("coot-ramalyze") #Put coot droppings here
     coot_ramalyze_path=pwd+"/coot-ramalyze/"
-    file_name=coot_ramalyze_path+"mol_{mol_id}.pdb".format(mol_id=mol_id)
+    file_name=molecule_name(mol_id)
     file_name_output=coot_ramalyze_path+"mol_{mol_id}_ramalyze_output.txt".format(mol_id=mol_id) #this file will have info on ramalyze outliers
-    write_pdb_file(mol_id,file_name) # write a copy of the active mol to the ramalyze dir
-    p=subprocess.Popen("phenix.ramalyze {file_name} outliers_only=true | awk '{{FS=\":\"}} {{print $1}}' | sed 's/[0123456789-]/ &/' | awk '{{if (NF==3) print}}' > {file_name_output}".format(file_name=file_name,file_name_output=file_name_output),shell=True)
+#     write_pdb_file(mol_id,file_name) # write a copy of the active mol to the ramalyze dir
+    p=subprocess.Popen("phenix.ramalyze {file_name} outliers_only=true rama_potential=emsley | awk '{{FS=\":\"}} {{print $1}}' | sed 's/[0123456789-]/ &/' | awk '{{if (NF==3) print}}' > {file_name_output}".format(file_name=file_name,file_name_output=file_name_output),shell=True)
     p.communicate() #wait for ramalyze to finish
     ramalyze_outlier_list=[]
     ramalyze_outlier_colour=34
@@ -636,7 +650,7 @@ def color_by_rama(mol_id):
         resname=line_list[2]
         ramalyze_outlier_colour_spec=[([ch_id,resid,ins_id],ramalyze_outlier_colour)]
         ramalyze_outlier_list=ramalyze_outlier_list+ramalyze_outlier_colour_spec
-    os.remove(file_name)
+#     os.remove(file_name)
     os.remove(file_name_output)
     try:
       set_user_defined_atom_colour_by_residue_py(mol_id,blank_res_list)
@@ -648,46 +662,45 @@ def color_by_rama(mol_id):
   else:
     info_dialog("Sorry, you need phenix.ramalyze, sed and awk installed and accessible from the terminal for this to work!")
 
-# def color_by_cc(mol_id):
-#   if find_exe("phenix.model_map_cc") and find_exe("awk") and find_exe("sed") and find_exe("grep") and imol_refinement_map()!=-1:
-#     import subprocess
-#     pwd=os.getcwd() #dir where coot was launched
-#     make_directory_maybe("coot-cc") #Put coot droppings here
-#     coot_cc_path=pwd+"/coot-cc/"
-#     pdb_name=coot_cc_path+"mol_{mol_id}.pdb".format(mol_id=mol_id)
-#     map_id=int(imol_refinement_map())
-#     map_name=coot_cc_path+"mol_{mol_id}.ccp4".format(mol_id=mol_id)
-#     file_name_output=coot_cc_path+"mol_{mol_id}_cc_output.txt".format(mol_id=mol_id) #this file will have info on cc outliers
+def color_by_cc(mol_id):
+  if find_exe("phenix.model_map_cc") and find_exe("awk") and find_exe("sed") and find_exe("grep") and imol_refinement_map()!=-1 and space_group(imol_refinement_map())=="P 1":
+    import subprocess
+    pwd=os.getcwd() #dir where coot was launched
+    make_directory_maybe("coot-cc") #Put coot droppings here
+    coot_cc_path=pwd+"/coot-cc/"
+    pdb_name=molecule_name(mol_id)
+    map_id=int(imol_refinement_map())
+    map_name=molecule_name(map_id)
 #     write_pdb_file(mol_id,pdb_name) # write a copy of the active mol to the cc dir
-#     com=center_of_mass(mol_id)
-#     cell_edges=[cell(mol_id)[0],cell(mol_id)[1],cell(mol_id)[2]]
-#     longest_edge=max(cell_edges)
-#     export_map_fragment(map_id,com[0],com[1],com[2],longest_edge,map_name)
-#     p=subprocess.Popen("phenix.model_map_cc {pdb_name} {map_name} | awk '{{if (NF==7) print}}' | grep chain > {file_name_output}".format(pdb_name=pdb_name,map_name=map_name,file_name_output=file_name_output),shell=True)
-#     p.communicate() #wait for cc to finish
-#     cc_list=[]
-#     with open(file_name_output) as f:
-#       cc_output = [x.strip('\n') for x in f.readlines()] #make a list of lines in cc output file, stripping newlines
-#       for line in cc_output:
-#         line_list=line.split()
-#         ch_id=line_list[2] # string.split() defaults to splitting by spaces and making into a list
-#         resid=int(line_list[4].rstrip('abcdefghjklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ')) #If second column has trailing letters (as it will if there is an insertion code) then strip them
-#         ins_id=str(line_list[4].lstrip('0123456789')) #If second column has trailing characters, these correspond to the insertion code. Strip leading numbers.
-#         cc=float(line_list[6])
-#         if cc<0.0:
-#           cc=0.0
-#         cc_colour=int((1.0-cc)*31+2)
-#         print("cc=",cc,"color=",cc_colour)
-#         cc_colour_spec=[([ch_id,resid,ins_id],cc_colour)]
-#         cc_list=cc_list+cc_colour_spec
-#     try:
-#       set_user_defined_atom_colour_by_residue_py(mol_id,cc_list)
-#       graphics_to_user_defined_atom_colours_representation(mol_id)
-#     except NameError:
-#       info_dialog("You need a newer Coot - custom coloring is only in r6174 and later, sorry.")
-#       pass
-#   else:
-#     info_dialog("Sorry, you need phenix.model_map_cc, sed and awk installed and accessible from the terminal for this to work!")
+    if not (map_name.endswith(".ccp4") or map_name.endswith(".mrc") or map_name.endswith(".map")):
+      map_name=coot_cc_path+"mol_{mol_id}.ccp4".format(mol_id=mol_id)
+      export_map(map_id,map_name)
+    file_name_output=coot_cc_path+"mol_{mol_id}_cc_output.txt".format(mol_id=mol_id) #this file will have info on cc outliers
+    p=subprocess.Popen("phenix.model_map_cc {pdb_name} {map_name} resolution=4.0 | awk '{{if (NF==7) print}}' | grep chain > {file_name_output}".format(pdb_name=pdb_name,map_name=map_name,file_name_output=file_name_output),shell=True)
+    p.communicate() #wait for cc to finish
+    cc_list=[]
+    with open(file_name_output) as f:
+      cc_output = [x.strip('\n') for x in f.readlines()] #make a list of lines in cc output file, stripping newlines
+      for line in cc_output:
+        line_list=line.split()
+        ch_id=line_list[2] # string.split() defaults to splitting by spaces and making into a list
+        resid=int(line_list[4].rstrip('abcdefghjklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ')) #If second column has trailing letters (as it will if there is an insertion code) then strip them
+        ins_id=str(line_list[4].lstrip('0123456789')) #If second column has trailing characters, these correspond to the insertion code. Strip leading numbers.
+        cc=float(line_list[6])
+        if cc<0.0:
+          cc=0.0
+        cc_colour=int((1.0-cc)*31+2)
+        print("cc=",cc,"color=",cc_colour)
+        cc_colour_spec=[([ch_id,resid,ins_id],cc_colour)]
+        cc_list=cc_list+cc_colour_spec
+    try:
+      set_user_defined_atom_colour_by_residue_py(mol_id,cc_list)
+      graphics_to_user_defined_atom_colours_representation(mol_id)
+    except NameError:
+      info_dialog("You need a newer Coot - custom coloring is only in r6188 and later, sorry.")
+      pass
+  else:
+    info_dialog("Sorry, you need phenix.model_map_cc, sed and awk installed and accessible from the terminal for this to work! Also, needs to be P1 map right now, sorry.")
     
 
 #Set refinement map to currently scrollable map
@@ -741,7 +754,7 @@ def cycle_rep_up(mol_id,flag):
       graphics_to_user_defined_atom_colours_representation(mol_id)
       cycle_rep_flag[mol_id]=5
     except NameError:
-      cycle_rep_flag[mol_id]=5
+      cycle_rep_flag[mol_id]=0
   elif cycle_rep_flag[mol_id]==5:
     try:
       graphics_to_user_defined_atom_colours_all_atoms_representation(mol_id)
@@ -749,6 +762,24 @@ def cycle_rep_up(mol_id,flag):
     except NameError:
       cycle_rep_flag[mol_id]=0
 
+# def add_partial_water():
+#   place_typed_atom_at_pointer("Water")
+#   refine_active_residue()
+#   mol_id=active_residue()[0]
+#   ch_id=active_residue()[1]
+#   resno=active_residue()[2]
+#   ins_code=active_residue()[3]
+#   atom_name=active_residue()[4]
+#   alt_conf=""
+#   set_atom_attribute(mol_id,ch_id,resno,ins_code,atom_name,alt_conf,"occ",0.5)
+# add_key_binding("Add partial water","w",
+# lambda: add_partial_water())
+
+# def delete_alt_confs():
+#   mol_id=active_residue()[0]
+#   for ch_id in chain_ids(mol_id):
+#     for resn in (first_residue(mol_id,ch_id),last_residue(mol_id,ch_id)+1):
+#      residue_inf=residue_info(mol_id,ch_id,resn,"")      
 
     
 def cycle_rep_down(mol_id,flag):
@@ -765,7 +796,7 @@ def cycle_rep_down(mol_id,flag):
       graphics_to_user_defined_atom_colours_all_atoms_representation(mol_id)
       cycle_rep_flag[mol_id]=0
     except NameError:
-      cycle_rep_flag[mol_id]=0
+      cycle_rep_flag[mol_id]=5
   elif cycle_rep_flag[mol_id]==0:
     try:
       graphics_to_user_defined_atom_colours_representation(mol_id)
@@ -966,6 +997,8 @@ def is_term_type_mc(mol_id,ch_id,resno):
   else:
     return 0
     
+
+#check if res is at N-term side of break in mid chain
 def is_term_type_mc_sn(mol_id,ch_id,sn):
   if sn in range(1,chain_n_residues(ch_id,mol_id)):
     resn_here=seqnum_from_serial_number(mol_id,ch_id,sn)
@@ -1110,11 +1143,13 @@ def auto_refine(n):
 def delete_chain():
   active_chain_id=active_residue()[1]
   active_mol_id=active_residue()[0]
+  turn_off_backup(active_mol_id)
   while (is_polymer(active_mol_id,active_chain_id)==1) or (
   is_solvent_chain_p(active_mol_id,active_chain_id)!=-1):
     first_res=first_residue(active_mol_id,active_chain_id)
     last_res=last_residue(active_mol_id,active_chain_id)
     delete_residue_range(active_mol_id,active_chain_id,first_res,last_res)
+  turn_on_backup(active_mol_id)
 
 #Fits all polymer chains to map
 def rigid_fit_all_chains():
@@ -1143,10 +1178,12 @@ def cut_active_chain():
   mol_id=active_residue()[0]
   ch_id=active_residue()[1]
   new_molecule_by_atom_selection(mol_id, "//%s//"%(ch_id))
+  turn_off_backup(mol_id)
   while (is_polymer(mol_id,ch_id)==1) or (is_solvent_chain_p(mol_id,ch_id)!=-1):
     first_res=first_residue(mol_id,ch_id)
     last_res=last_residue(mol_id,ch_id)
     delete_residue_range(mol_id,ch_id,first_res,last_res)
+  turn_on_backup(mol_id)
 
 
 #Copy active segment
@@ -1330,6 +1367,19 @@ def refine_residues_click():
       info_dialog("Sorry, start and end residues must be in same mol and chain!")
   user_defined_click(2,refine_residues_click_a)
   
+def refine_residues_range(mol_id,ch_id,resno_1,resno_2,ins_code_1):
+  if resno_1>=resno_2:
+    resno_1,resno_2=resno_2,resno_1 #Swap res numbers if wrong way round
+  res_list=[]
+  for resn in range(resno_1,resno_2+1):
+    res_triple=[ch_id,resn,ins_code_1] #Does not account for varying ins code. Should be able to fix using residues_matching_criteria(), e.g.:
+    #residues_matching_criteria(0, lambda chain_id,resno,ins_code,serial: True), except substitute a test func for true
+    #that evaluates to true if resno, mol id and ch_id match, and returns ins_code (third item in output triple)
+    res_list.append(res_triple) #append rather than adding, bc making list of lists
+  refine_residues(mol_id,res_list)
+
+  
+  
 #refine range, plus everything in contact with it
 def refine_residues_sphere_click():
   def refine_residues_sphere_click_a(res1,res2):
@@ -1411,6 +1461,7 @@ def cut_frag_by_click():
     resno_1=res1[3]
     resno_2=res2[3]
     if (mol_id_1==mol_id_2) and (ch_id_1==ch_id_2):
+      turn_off_backup(mol_id_1)
       if resno_1>resno_2:
         atom_sel="//%s/%s-%s" %(ch_id_1,resno_2,resno_1)
         new_molecule_by_atom_selection(mol_id_1,atom_sel)
@@ -1423,6 +1474,7 @@ def cut_frag_by_click():
         atom_sel="//%s/%s" %(ch_id_1,resno_2)
         new_molecule_by_atom_selection(mol_id_1,atom_sel)
         delete_residue_range(mol_id_1,ch_id_1,resno_2)
+      turn_on_backup(mol_id_1)
     else:
       info_dialog("Start and end residues must be in the same molecule and chain!")
   user_defined_click(2,cut_frag)
@@ -2252,16 +2304,18 @@ def highlight_chain_breaks():
   turn_off_backup(mol_id)
   obj_number=generic_object_with_name("chain_breaks_{mol_id}".format(mol_id=mol_id))
   generic_object_clear(obj_number)
-  valid_resnames=['A','C','T','G','U','ALA','UNK','ARG','ASN','ASP','CYS','GLU','GLN','GLY','HIS','ILE','LEU','LYS','MET','MSE','PHE','PRO','SER','THR','TRP','TYR','VAL']
+  protein_resnames=['ALA','UNK','ARG','ASN','ASP','CYS','GLU','GLN','GLY','HIS','ILE','LEU','LYS','MET','MSE','PHE','PRO','SER','THR','TRP','TYR','VAL']
+  na_resnames=['A','C','T','G','U']
+  missing_segments_list=[]
   for ch_id in chain_ids(mol_id):
     for resn in range(0,chain_n_residues(ch_id,mol_id)):
       resname=resname_from_serial_number(mol_id,ch_id,resn)
       print(resname)
-      if (resname in valid_resnames):
+      if (resname in protein_resnames):
         if ((is_term_type_mc_sn(mol_id,ch_id,resn)==1) or (is_term_type_mn_sn(mol_id,ch_id,resn)==1)):
           seqnum=seqnum_from_serial_number(mol_id,ch_id,resn)
 #         sel_string="//"+str(ch_id)+"/"+str(seqnum)+"/CA"
-#         make_ball_and_stick(mol_id,sel_string,0,0.5,1)
+#         make_ball_and_stick(mol_id,sel_string,0,0.5,1
           if (is_term_type_mn_sn(mol_id,ch_id,resn)==1):
             x_mn=atom_specs(mol_id,ch_id,seqnum,"","CA","")[-3]
             y_mn=atom_specs(mol_id,ch_id,seqnum,"","CA","")[-2]
@@ -2269,8 +2323,30 @@ def highlight_chain_breaks():
             x_mid=(x_mn+x_here)/2
             y_mid=(y_mn+y_here)/2
             z_mid=(z_mn+z_here)/2
-            to_generic_object_add_dashed_line(obj_number,"red",3,3,x_here,y_here,z_here,x_mn,y_mn,z_mn)
-            #res_missing=seqnum-seqnum_from_serial_number(mol_id,ch_id,resn-1)
+            res_missing=seqnum-seqnum_from_serial_number(mol_id,ch_id,resn-1)
+            #formula: sqrt((x1-x2)^2+(y1-y2)^2+(z1-z2)^2)
+            distance=((x_here-x_mn)**2+(y_here-y_mn)**2+(z_here-z_mn)**2)**0.5
+            print("distance",distance)
+            distance_per_residue=distance/res_missing
+            print("per residue distance",distance_per_residue)
+            label_string="{ch_id}  {res_start}...{res_end} ({res_missing} missing residues)".format(ch_id=ch_id,res_start=seqnum_from_serial_number(mol_id,ch_id,resn-1),res_end=seqnum,res_missing=res_missing)
+            if distance_per_residue>3.8:
+              label_string="MIND THE GAP! {ch_id}  {res_start}...{res_end} ({res_missing} missing residues for {distance:6.1f} A)".format(ch_id=ch_id,res_start=seqnum_from_serial_number(mol_id,ch_id,resn-1),res_end=seqnum,res_missing=res_missing,distance=distance)
+            if res_missing >=50:
+              label_string="!!!  {ch_id}  {res_start}...{res_end} ({res_missing} missing residues)".format(ch_id=ch_id,res_start=seqnum_from_serial_number(mol_id,ch_id,resn-1),res_end=seqnum,res_missing=res_missing)
+            list_entry=[label_string,x_mid,y_mid,z_mid]
+            missing_segments_list.append(list_entry)
+            if res_missing <=15:
+              gap_color="gray"
+            elif (res_missing > 15) and (res_missing<50):
+              gap_color="orange"
+            else:
+              gap_color="red"
+            if distance_per_residue>3.8:
+              gap_color="cyan" 
+            line_width=4
+            dash_density=3
+            to_generic_object_add_dashed_line(obj_number,gap_color,line_width,dash_density,x_here,y_here,z_here,x_mn,y_mn,z_mn)
             #if res_missing>=20:
             #  place_text(str(res_missing),x_mid,y_mid,z_mid,1)
           else: #By definition we always pass through here first (need to hit a term_type_mc befor term_type_mn)
@@ -2285,6 +2361,54 @@ def highlight_chain_breaks():
           seqnum=seqnum_from_serial_number(mol_id,ch_id,resn)
           sel_string="//"+str(ch_id)+"/"+str(seqnum)+"/CA"
           make_ball_and_stick(mol_id,sel_string,0,0.5,1)
+      if (resname in na_resnames):
+        if ((is_term_type_mc_sn(mol_id,ch_id,resn)==1) or (is_term_type_mn_sn(mol_id,ch_id,resn)==1)):
+          seqnum=seqnum_from_serial_number(mol_id,ch_id,resn)
+#         sel_string="//"+str(ch_id)+"/"+str(seqnum)+"/CA"
+#         make_ball_and_stick(mol_id,sel_string,0,0.5,1
+          if (is_term_type_mn_sn(mol_id,ch_id,resn)==1):
+            x_mn=atom_specs(mol_id,ch_id,seqnum,"","P","")[-3]
+            y_mn=atom_specs(mol_id,ch_id,seqnum,"","P","")[-2]
+            z_mn=atom_specs(mol_id,ch_id,seqnum,"","P","")[-1]
+            x_mid=(x_mn+x_here)/2
+            y_mid=(y_mn+y_here)/2
+            z_mid=(z_mn+z_here)/2
+            res_missing=seqnum-seqnum_from_serial_number(mol_id,ch_id,resn-1)
+            #formula: sqrt((x1-x2)^2+(y1-y2)^2+(z1-z2)^2)
+            distance=((x_here-x_mn)**2+(y_here-y_mn)**2+(z_here-z_mn)**2)**0.5
+            distance_per_residue=distance/res_missing
+            label_string="{ch_id}  {res_start}...{res_end} ({res_missing} missing residues)".format(ch_id=ch_id,res_start=seqnum_from_serial_number(mol_id,ch_id,resn-1),res_end=seqnum,res_missing=res_missing)
+            if distance_per_residue>5.9:
+              label_string="MIND THE GAP! {ch_id}  {res_start}...{res_end} ({res_missing} missing residues for {distance:6.1f} A)".format(ch_id=ch_id,res_start=seqnum_from_serial_number(mol_id,ch_id,resn-1),res_end=seqnum,res_missing=res_missing,distance=distance)
+            if res_missing >=50:
+              label_string="!!!  {ch_id}  {res_start}...{res_end} ({res_missing} missing residues)".format(ch_id=ch_id,res_start=seqnum_from_serial_number(mol_id,ch_id,resn-1),res_end=seqnum,res_missing=res_missing)
+            list_entry=[label_string,x_mid,y_mid,z_mid]
+            missing_segments_list.append(list_entry)
+            if res_missing <=15:
+              gap_color="gray"
+            elif (res_missing > 15) and (res_missing<50):
+              gap_color="orange"
+            else:
+              gap_color="red"
+            if distance_per_residue>5.9:
+              gap_color="cyan" 
+            line_width=4
+            dash_density=3
+            to_generic_object_add_dashed_line(obj_number,gap_color,line_width,dash_density,x_here,y_here,z_here,x_mn,y_mn,z_mn)
+            #if res_missing>=20:
+            #  place_text(str(res_missing),x_mid,y_mid,z_mid,1)
+          else: #By definition we always pass through here first (need to hit a term_type_mc befor term_type_mn)
+            x_here=atom_specs(mol_id,ch_id,seqnum,"","P","")[-3]
+            y_here=atom_specs(mol_id,ch_id,seqnum,"","P","")[-2]
+            z_here=atom_specs(mol_id,ch_id,seqnum,"","P","")[-1]
+        if (resn==0):
+          seqnum=seqnum_from_serial_number(mol_id,ch_id,resn)
+          sel_string="//"+str(ch_id)+"/"+str(seqnum)+"/P"
+          make_ball_and_stick(mol_id,sel_string,0,0.5,1)
+        if (is_last_polymer_residue_sn(mol_id,ch_id,resn)==1):
+          seqnum=seqnum_from_serial_number(mol_id,ch_id,resn)
+          sel_string="//"+str(ch_id)+"/"+str(seqnum)+"/P"
+          make_ball_and_stick(mol_id,sel_string,0,0.5,1)
   set_display_generic_object(obj_number,1)
   try:
     attach_generic_object_to_molecule(obj_number, mol_id)
@@ -2292,9 +2416,12 @@ def highlight_chain_breaks():
     info_dialog("attach_generic_object_to_molecule is only present in Coot r6057 and later, sorry.")
     pass
   turn_on_backup(mol_id)
+  interesting_things_gui("Missing segments",missing_segments_list)
+
 
 def highlight_all_chain_breaks():
-  valid_resnames=['A','C','T','G','U','ALA','UNK','ARG','ASN','ASP','CYS','GLU','GLN','GLY','HIS','ILE','LEU','LYS','MET','MSE','PHE','PRO','SER','THR','TRP','TYR','VAL']
+  protein_resnames=['ALA','UNK','ARG','ASN','ASP','CYS','GLU','GLN','GLY','HIS','ILE','LEU','LYS','MET','MSE','PHE','PRO','SER','THR','TRP','TYR','VAL']
+  na_resnames=['A','C','T','G','U']
   for mol_id in model_molecule_list():
     clear_ball_and_stick(mol_id)
     turn_off_backup(mol_id)
@@ -2304,7 +2431,7 @@ def highlight_all_chain_breaks():
       for resn in range(0,chain_n_residues(ch_id,mol_id)):
         resname=resname_from_serial_number(mol_id,ch_id,resn)
         print(resname)
-        if (resname in valid_resnames):
+        if (resname in protein_resnames):
           if ((is_term_type_mc_sn(mol_id,ch_id,resn)==1) or (is_term_type_mn_sn(mol_id,ch_id,resn)==1)):
             seqnum=seqnum_from_serial_number(mol_id,ch_id,resn)
   #         sel_string="//"+str(ch_id)+"/"+str(seqnum)+"/CA"
@@ -2316,7 +2443,21 @@ def highlight_all_chain_breaks():
               x_mid=(x_mn+x_here)/2
               y_mid=(y_mn+y_here)/2
               z_mid=(z_mn+z_here)/2
-              to_generic_object_add_dashed_line(obj_number,"red",3,3,x_here,y_here,z_here,x_mn,y_mn,z_mn)
+              res_missing=seqnum-seqnum_from_serial_number(mol_id,ch_id,resn-1)
+              #formula: sqrt((x1-x2)^2+(y1-y2)^2+(z1-z2)^2)
+              distance=((x_here-x_mn)**2+(y_here-y_mn)**2+(z_here-z_mn)**2)**0.5
+              distance_per_residue=distance/res_missing
+              if res_missing <=15:
+                gap_color="gray"
+              elif (res_missing > 15) and (res_missing<50):
+                gap_color="orange"
+              else:
+                gap_color="red"
+              if distance_per_residue>3.8:
+                gap_color="cyan" 
+              line_width=4
+              dash_density=3
+              to_generic_object_add_dashed_line(obj_number,gap_color,line_width,dash_density,x_here,y_here,z_here,x_mn,y_mn,z_mn)
               #res_missing=seqnum-seqnum_from_serial_number(mol_id,ch_id,resn-1)
               #if res_missing>=20:
               #  place_text(str(res_missing),x_mid,y_mid,z_mid,1)
@@ -2331,6 +2472,45 @@ def highlight_all_chain_breaks():
           if (is_last_polymer_residue_sn(mol_id,ch_id,resn)==1):
             seqnum=seqnum_from_serial_number(mol_id,ch_id,resn)
             sel_string="//"+str(ch_id)+"/"+str(seqnum)+"/CA"
+            make_ball_and_stick(mol_id,sel_string,0,0.5,1)
+        if (resname in na_resnames):
+          if ((is_term_type_mc_sn(mol_id,ch_id,resn)==1) or (is_term_type_mn_sn(mol_id,ch_id,resn)==1)):
+            seqnum=seqnum_from_serial_number(mol_id,ch_id,resn)
+            if (is_term_type_mn_sn(mol_id,ch_id,resn)==1):
+              x_mn=atom_specs(mol_id,ch_id,seqnum,"","P","")[-3]
+              y_mn=atom_specs(mol_id,ch_id,seqnum,"","P","")[-2]
+              z_mn=atom_specs(mol_id,ch_id,seqnum,"","P","")[-1]
+              x_mid=(x_mn+x_here)/2
+              y_mid=(y_mn+y_here)/2
+              z_mid=(z_mn+z_here)/2
+              res_missing=seqnum-seqnum_from_serial_number(mol_id,ch_id,resn-1)
+              #formula: sqrt((x1-x2)^2+(y1-y2)^2+(z1-z2)^2)
+              distance=((x_here-x_mn)**2+(y_here-y_mn)**2+(z_here-z_mn)**2)**0.5
+              distance_per_residue=distance/res_missing
+              if res_missing <=15:
+                gap_color="gray"
+              elif (res_missing > 15) and (res_missing<50):
+                gap_color="orange"
+              else:
+                gap_color="red"
+              if distance_per_residue>5.9:
+                gap_color="cyan" 
+              line_width=4
+              dash_density=3
+              to_generic_object_add_dashed_line(obj_number,gap_color,line_width,dash_density,x_here,y_here,z_here,x_mn,y_mn,z_mn)
+              #if res_missing>=20:
+              #  place_text(str(res_missing),x_mid,y_mid,z_mid,1)
+            else: #By definition we always pass through here first (need to hit a term_type_mc befor term_type_mn)
+              x_here=atom_specs(mol_id,ch_id,seqnum,"","P","")[-3]
+              y_here=atom_specs(mol_id,ch_id,seqnum,"","P","")[-2]
+              z_here=atom_specs(mol_id,ch_id,seqnum,"","P","")[-1]
+          if (resn==0):
+            seqnum=seqnum_from_serial_number(mol_id,ch_id,resn)
+            sel_string="//"+str(ch_id)+"/"+str(seqnum)+"/P"
+            make_ball_and_stick(mol_id,sel_string,0,0.5,1)
+          if (is_last_polymer_residue_sn(mol_id,ch_id,resn)==1):
+            seqnum=seqnum_from_serial_number(mol_id,ch_id,resn)
+            sel_string="//"+str(ch_id)+"/"+str(seqnum)+"/P"
             make_ball_and_stick(mol_id,sel_string,0,0.5,1)
     set_display_generic_object(obj_number,1) 
     try:
@@ -2376,7 +2556,7 @@ def global_hbonds_and_baddies():
       pass
       
 def clear_dots():
-  undisplay_list=["wide contact","close contact", "small overlap","bad overlap","H-bonds"]
+  undisplay_list=["wide contact","close contact", "small overlap","bad overlap","H-bonds","H-bond","big-overlap","close-contact","small-overlap","wide-contact","clashes"]
   for obj_name in undisplay_list:
     obj_number=generic_object_with_name(obj_name)
     generic_object_clear(obj_number)
@@ -2673,7 +2853,7 @@ def run_prosmart_self():
     else:
       print "Reading ProSMART restraints from", prosmart_out
       add_refmac_extra_restraints(imol_target, prosmart_out)
-      delete_restraints_worse_than(imol_target,4)
+      delete_extra_restraints_worse_than(imol_target,4)
       
 #Fix all atoms in active residue
 def fix_active_residue():
@@ -2706,10 +2886,90 @@ def reload_model():
 def copy_ncs_chain_from_active():
   mol_id=active_residue()[0]
   ch_id=active_residue()[1]
+  turn_off_backup(mol_id)
   ncs_control_change_ncs_master_to_chain_id(mol_id,ch_id)
   copy_from_ncs_master_to_others(mol_id,ch_id)
-  
-  
+  turn_on_backup(mol_id)
+
+def return_seq_as_string(mol_id,ch_id):
+  seq=''
+  for sn in range(0,chain_n_residues(ch_id,mol_id)):
+    resno=seqnum_from_serial_number(mol_id,ch_id,sn)
+    ins_code=insertion_code_from_serial_number(mol_id,ch_id,sn)
+    residue_name_3_letter=residue_name(mol_id,ch_id,resno,ins_code)
+    aa_code=three_letter_code2single_letter(residue_name_3_letter)
+    if (len(residue_name(mol_id,ch_id,resno,ins_code))==1):
+      aa_code=residue_name_3_letter
+    if (residue_name(mol_id,ch_id,resno,ins_code)!="ALA") and (aa_code=="A") and (len(residue_name(mol_id,ch_id,resno,ins_code))!=1):
+      aa_code="X"
+    seq=seq+aa_code
+  return seq
+    
+def find_sequence_in_current_chain(subseq):
+  subseq=subseq.upper()
+  mol_id=active_residue()[0]
+  ch_id=active_residue()[1]
+  seq=return_seq_as_string(mol_id,ch_id)
+  index=0
+  sn_list=[]
+  while index < len(seq):
+    try:
+      index=seq.index(subseq,index)
+    except ValueError:
+      break
+    sn_list.append(index)
+    if index==-1:
+      break
+    index=index+len(subseq)
+  if len(sn_list)==1:
+    sn_start=sn_list[0]
+    resno=seqnum_from_serial_number(mol_id,ch_id,sn_start)
+    ins_code=insertion_code_from_serial_number(mol_id,ch_id,sn_start)
+    alt_conf=residue_alt_confs(mol_id,ch_id,resno,ins_code)[0]
+    print("sn_start",sn_start)
+    try:
+      x=atom_specs(mol_id,ch_id,resno,ins_code,"CA",alt_conf)[-3]
+      y=atom_specs(mol_id,ch_id,resno,ins_code,"CA",alt_conf)[-2]
+      z=atom_specs(mol_id,ch_id,resno,ins_code,"CA",alt_conf)[-1]
+    except TypeError:
+      x=atom_specs(mol_id,ch_id,resno,ins_code,"P",alt_conf)[-3]
+      y=atom_specs(mol_id,ch_id,resno,ins_code,"P",alt_conf)[-2]
+      z=atom_specs(mol_id,ch_id,resno,ins_code,"P",alt_conf)[-1]
+    set_rotation_centre(x,y,z)
+  elif len(sn_list)==0:
+    info_dialog("Sequence not found!")
+  elif len(sn_list)>1:
+    interesting_list=[]
+    count=0
+    for sn in sn_list:
+      count=count+1
+      resno=seqnum_from_serial_number(mol_id,ch_id,sn)
+      ins_code=insertion_code_from_serial_number(mol_id,ch_id,sn)
+      alt_conf=residue_alt_confs(mol_id,ch_id,resno,ins_code)[0]
+      print("sn_start",sn)
+    try:
+      x=atom_specs(mol_id,ch_id,resno,ins_code,"CA",alt_conf)[-3]
+      y=atom_specs(mol_id,ch_id,resno,ins_code,"CA",alt_conf)[-2]
+      z=atom_specs(mol_id,ch_id,resno,ins_code,"CA",alt_conf)[-1]
+    except TypeError:
+      x=atom_specs(mol_id,ch_id,resno,ins_code,"P",alt_conf)[-3]
+      y=atom_specs(mol_id,ch_id,resno,ins_code,"P",alt_conf)[-2]
+      z=atom_specs(mol_id,ch_id,resno,ins_code,"P",alt_conf)[-1]
+    list_entry=[str(count),x,y,z]
+    interesting_list.append(list_entry)
+    interesting_things_gui("Matches to entered sequence",interesting_list)
+
+def find_sequence_with_entry():
+  generic_single_entry("Enter sequence fragment to find",
+  "MAAAA","Find sequence",find_sequence_in_current_chain)
+
+      
+
+      
+      
+            
+
+      
 #Test post manipulation background func
 # import time, threading
 # def background_func():
@@ -2837,11 +3097,13 @@ add_simple_coot_menu_menuitem(submenu_display,
 add_simple_coot_menu_menuitem(submenu_display, "Colour entered subset of protein residues for active mol", lambda func: color_protein_residue_subset())
 
 add_simple_coot_menu_menuitem(submenu_display,
-"Make copy of active mol colored by CaBLAM outliers (blue) (Slow, needs phenix)", lambda func: color_by_cablam2(active_residue()[0]))
+"Color active mol by CaBLAM outliers (blue) (needs phenix)", lambda func: color_by_cablam2(active_residue()[0]))
 
 add_simple_coot_menu_menuitem(submenu_display,
-"Make copy of active mol colored by ramachandran outliers (blue) (Slow, needs phenix)", lambda func: color_by_rama(active_residue()[0]))
+"Color active mol by ramachandran outliers (blue) (needs phenix)", lambda func: color_by_rama(active_residue()[0]))
 
+add_simple_coot_menu_menuitem(submenu_display,
+"Color active mol by map/model-CC at 4 A (Slow, needs phenix, P1 only)", lambda func: color_by_cc(active_residue()[0]))
 
 add_simple_coot_menu_menuitem(submenu_display, "Highlight chain breaks in active mol", lambda func: highlight_chain_breaks())
 
@@ -2854,6 +3116,8 @@ add_simple_coot_menu_menuitem(submenu_display, "Show local probe dots (H-bonds, 
 add_simple_coot_menu_menuitem(submenu_display, "Show global probe dots (bad overlaps only)", lambda func: global_hbonds_and_baddies())
 
 add_simple_coot_menu_menuitem(submenu_display, "Clear probe dots", lambda func: clear_dots())
+
+add_simple_coot_menu_menuitem(submenu_display, "Find sequence", lambda func: find_sequence_with_entry())
 
 
 
