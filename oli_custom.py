@@ -1185,6 +1185,32 @@ def cut_active_chain():
     delete_residue_range(mol_id,ch_id,first_res,last_res)
   turn_on_backup(mol_id)
 
+#Faster rigid body fit (not relevant for smaller ranges, but much faster for larger ranges)
+def fast_rigid_fit(res_start,res_end,ch_id,mol_id):
+  if (mol_id in model_molecule_number_list()) and (ch_id in chain_ids(mol_id)):
+    turn_off_backup(mol_id)
+    ins_code=""
+    sn_max=chain_n_residues(ch_id,mol_id)-1
+    res_min=seqnum_from_serial_number(mol_id,ch_id,0)
+    res_max=seqnum_from_serial_number(mol_id,ch_id,sn_max)
+    if res_start>res_end:
+      res_start,res_end=res_end,res_start
+    while not residue_exists_qm(mol_id,ch_id,res_start,ins_code) and res_start<=res_max:
+     res_start=res_start+1
+    while not residue_exists_qm(mol_id,ch_id,res_end,ins_code) and res_end>=res_min:
+     res_end=res_end-1
+    if res_start<=res_end:
+      new_molecule_by_atom_selection(mol_id, "//{ch_id}/{res_start}-{res_end}/".format(ch_id=ch_id,res_start=res_start,res_end=res_end))
+      mol_id_new=model_molecule_number_list()[-1]
+      rigid_body_refine_by_atom_selection(mol_id_new,"/ /")
+      accept_regularizement()
+      delete_residue_range(mol_id,ch_id,res_start,res_end) #delete copied range from original mol
+      merge_molecules([mol_id_new],mol_id) #Merge fit segment back into original mol
+      change_chain_id_with_result(mol_id,chain_ids(mol_id)[-1],ch_id,1,res_start,res_end) #Merge chains
+      close_molecule(mol_id_new)
+    turn_on_backup(mol_id)
+  else:
+    info_dialog("The specified chain or molecule does not exist!")
 
 #Copy active segment
 def copy_active_segment():
@@ -1197,7 +1223,7 @@ def copy_active_segment():
       res_start=seg[2]
       res_end=seg[3]
       ch_id=seg[1]
-      new_molecule_by_atom_selection(mol_id, "/{mol_id}/{ch_id}/{res_start}-{res_end}/".format(mol_id=mol_id,ch_id=ch_id,res_start=res_start,res_end=res_end))
+      new_molecule_by_atom_selection(mol_id, "//{ch_id}/{res_start}-{res_end}/".format(ch_id=ch_id,res_start=res_start,res_end=res_end))
 
 #Cut active segment
 def cut_active_segment():
@@ -1210,7 +1236,7 @@ def cut_active_segment():
       res_start=seg[2]
       res_end=seg[3]
       ch_id=seg[1]
-      new_molecule_by_atom_selection(mol_id, "/{mol_id}/{ch_id}/{res_start}-{res_end}/".format(mol_id=mol_id,ch_id=ch_id,res_start=res_start,res_end=res_end))
+      new_molecule_by_atom_selection(mol_id, "//{ch_id}/{res_start}-{res_end}/".format(ch_id=ch_id,res_start=res_start,res_end=res_end))
       delete_residue_range(mol_id,ch_id,res_start,res_end)
 
 #Jiggle-fits active chain to map
