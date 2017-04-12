@@ -2276,7 +2276,8 @@ def mutate_by_resnum():
       if ((res!=seq_dic.get(seqnum)) and ((res in aa_dic.values()) or (res=="MSE"))):
         if seq_dic.get(seqnum):
           mutate(mol_id,ch_id,seqnum,ins_id,seq_dic.get(seqnum))
-          delete_residue_sidechain(mol_id,ch_id,seqnum,ins_id,0)
+          if seq_dic.get(seqnum)!="PRO":
+            delete_residue_sidechain(mol_id,ch_id,seqnum,ins_id,0)
       sn=sn+1
     turn_on_backup(mol_id)
   generic_single_entry("Enter raw amino acid sequence (must be complete!)",
@@ -2938,6 +2939,7 @@ def find_sequence_in_current_chain(subseq):
   seq=return_seq_as_string(mol_id,ch_id)
   index=0
   sn_list=[]
+  interesting_list=[]
   while index < len(seq):
     try:
       index=seq.index(subseq,index)
@@ -2965,7 +2967,6 @@ def find_sequence_in_current_chain(subseq):
   elif len(sn_list)==0:
     info_dialog("Sequence not found!")
   elif len(sn_list)>1:
-    interesting_list=[]
     count=0
     for sn in sn_list:
       count=count+1
@@ -2973,16 +2974,18 @@ def find_sequence_in_current_chain(subseq):
       ins_code=insertion_code_from_serial_number(mol_id,ch_id,sn)
       alt_conf=residue_alt_confs(mol_id,ch_id,resno,ins_code)[0]
       print("sn_start",sn)
-    try:
-      x=atom_specs(mol_id,ch_id,resno,ins_code,"CA",alt_conf)[-3]
-      y=atom_specs(mol_id,ch_id,resno,ins_code,"CA",alt_conf)[-2]
-      z=atom_specs(mol_id,ch_id,resno,ins_code,"CA",alt_conf)[-1]
-    except TypeError:
-      x=atom_specs(mol_id,ch_id,resno,ins_code,"P",alt_conf)[-3]
-      y=atom_specs(mol_id,ch_id,resno,ins_code,"P",alt_conf)[-2]
-      z=atom_specs(mol_id,ch_id,resno,ins_code,"P",alt_conf)[-1]
-    list_entry=[str(count),x,y,z]
-    interesting_list.append(list_entry)
+      try:
+        x=atom_specs(mol_id,ch_id,resno,ins_code,"CA",alt_conf)[-3]
+        y=atom_specs(mol_id,ch_id,resno,ins_code,"CA",alt_conf)[-2]
+        z=atom_specs(mol_id,ch_id,resno,ins_code,"CA",alt_conf)[-1]
+      except TypeError:
+        x=atom_specs(mol_id,ch_id,resno,ins_code,"P",alt_conf)[-3]
+        y=atom_specs(mol_id,ch_id,resno,ins_code,"P",alt_conf)[-2]
+        z=atom_specs(mol_id,ch_id,resno,ins_code,"P",alt_conf)[-1]
+      list_entry=[str(resno),x,y,z]
+      interesting_list.append(list_entry)
+      print("interesting list",interesting_list)
+    print("interesting list",interesting_list)
     interesting_things_gui("Matches to entered sequence",interesting_list)
 
 def find_sequence_with_entry():
