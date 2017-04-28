@@ -2613,7 +2613,7 @@ def make_alkyl_chain():
     res_no=1
     ins_code=""
     altloc=""
-    new_residue_name="UNL"
+    new_residue_name="CCC"
     set_residue_name(mol_id,ch_id,res_no,ins_code,new_residue_name)
     delete_atom(mol_id,ch_id,res_no,ins_code," C  ",altloc)
     prodrg_ify(mol_id,ch_id,res_no,ins_code)
