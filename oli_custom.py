@@ -169,8 +169,12 @@ add_key_binding("Add terminal residue","y",
 lambda: add_term_shortcut())
  
 #add terminal residue
-add_key_binding("Add terminal residue (override)","Y",
+add_key_binding("Grow helix","Y",
 lambda: add_term_shortcut_force())
+
+#add terminal residue
+add_key_binding("Grow strand","T",
+lambda: add_term_shortcut_force_strand())
 
  
 #Refine active residue
@@ -1611,6 +1615,16 @@ def force_add_terminal_residue_noclick(mol_id,ch_id,res_no):
     set_b_factor_residue_range(mol_id,ch_id,res_no-1,res_no-1,default_new_atoms_b_factor())
   sort_residues(mol_id)
 
+def force_add_terminal_residue_noclick_strand(mol_id,ch_id,res_no):
+  res_type="auto"
+  add_terminal_residue_using_phi_psi(mol_id,ch_id,res_no,
+  res_type,-139,135)
+  if residue_exists_qm(mol_id,ch_id,res_no+1,""):
+    set_b_factor_residue_range(mol_id,ch_id,res_no+1,res_no+1,default_new_atoms_b_factor())
+  elif residue_exists_qm(mol_id,ch_id,res_no-1,""):
+    set_b_factor_residue_range(mol_id,ch_id,res_no-1,res_no-1,default_new_atoms_b_factor())
+  sort_residues(mol_id)
+
 #Grow helix from selected terminus
 def grow_helix():
   def grow_helix_post_click(res1):
@@ -2846,6 +2860,26 @@ def add_term_shortcut_force():
     sort_residues(mol_id)
     set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg+1,"CA")
     
+def add_term_shortcut_force_strand():
+  mol_id=active_residue()[0]
+  ch_id=active_residue()[1]
+  resn=active_residue()[2]
+  first_in_seg=first_residue_in_seg(mol_id,ch_id,resn)
+  last_in_seg=last_residue_in_seg(mol_id,ch_id,resn)
+  delta_first=abs(first_in_seg-resn)
+  delta_last=abs(last_in_seg-resn)
+  set_new_atom_b_fac_to_mean()
+  if delta_first<=delta_last:
+    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+    force_add_terminal_residue_noclick_strand(mol_id,ch_id,first_in_seg)
+    sort_residues(mol_id)
+    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg-1,"CA")
+  else:
+    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,"CA")
+    force_add_terminal_residue_noclick_strand(mol_id,ch_id,last_in_seg)
+    sort_residues(mol_id)
+    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg+1,"CA")
+
 #Add h-bond restraints to active mol with Prosmart
 def run_prosmart_self():
   """
