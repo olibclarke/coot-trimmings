@@ -971,15 +971,20 @@ def get_sn_from_resno(mol_id,ch_id,resno):
   sn=0
   sn_max=chain_n_residues(ch_id,mol_id)-1
   sn_dict={}
-  while sn<=sn_max:
-    resno_here=seqnum_from_serial_number(mol_id,ch_id,sn)
-    sn_dict[resno_here]=sn
-    sn=sn+1
-  try:
-    sn_out=sn_dict[resno]
-    return sn_out
-  except KeyError:
-    return -1
+  if (seqnum_from_serial_number(mol_id,ch_id,sn)==resno):
+    return sn
+  elif (seqnum_from_serial_number(mol_id,ch_id,sn_max)==resno):
+    return sn_max
+  else:
+    while sn<=sn_max:
+      resno_here=seqnum_from_serial_number(mol_id,ch_id,sn)
+      sn_dict[resno_here]=sn
+      sn=sn+1
+    try:
+      sn_out=sn_dict[resno]
+      return sn_out
+    except KeyError:
+      return -1
 
 #check if res is at C-term side of break in mid chain
 def is_term_type_mc(mol_id,ch_id,resno):
