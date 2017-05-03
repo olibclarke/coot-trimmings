@@ -1069,29 +1069,23 @@ def is_term_type_mn_sn(mol_id,ch_id,sn):
   else:
     return 0
   
-#Check for last residue in active segment  
-def last_residue_in_seg(mol_id,ch_id,current_res_no):
-  if current_res_no==last_polymer_residue(mol_id,ch_id) or is_term_type_mc(mol_id,ch_id,current_res_no):
-    output=current_res_no
-  elif current_res_no>last_residue(mol_id,ch_id):
-    output=last_residue(mol_id,ch_id)
-  else:
-    while not (is_term_type_mc(mol_id,ch_id,current_res_no) or (current_res_no==last_polymer_residue(mol_id,ch_id))):
-      current_res_no=current_res_no+1
-    output=current_res_no
-  return output
+        
+def first_residue_in_seg(mol_id,ch_id,resno):
+  sn_here=get_sn_from_resno(mol_id,ch_id,resno)
+  sn=sn_here
+  while is_term_type_mn_sn(mol_id,ch_id,sn)==0 and sn>0 and seqnum_from_serial_number(mol_id,ch_id,sn-1)!=-10000 and is_polymer_residue(mol_id,ch_id,sn-1)==1:
+    sn=sn-1
+  res_start=seqnum_from_serial_number(mol_id,ch_id,sn)
+  return res_start
   
-#Check for first residue in segment
-def first_residue_in_seg(mol_id,ch_id,current_res_no):
-  if current_res_no==first_polymer_residue(mol_id,ch_id) or is_term_type_mn(mol_id,ch_id,current_res_no):
-    output=current_res_no
-  elif current_res_no<first_residue(mol_id,ch_id):
-    output=first_residue(mol_id,ch_id)
-  else:
-    while not (is_term_type_mn(mol_id,ch_id,current_res_no) or (current_res_no==first_polymer_residue(mol_id,ch_id))):
-      current_res_no=current_res_no-1
-    output=current_res_no
-  return output
+def last_residue_in_seg(mol_id,ch_id,resno):
+  sn_here=get_sn_from_resno(mol_id,ch_id,resno)
+  sn=sn_here
+  while is_term_type_mc_sn(mol_id,ch_id,sn)==0 and seqnum_from_serial_number(mol_id,ch_id,sn+1)!=-10000 and is_polymer_residue(mol_id,ch_id,sn+1)==1:
+    sn=sn+1
+  res_end=seqnum_from_serial_number(mol_id,ch_id,sn)
+  return res_end
+
 
 #Get serial number of active residue
 def sn_of_active_res():
@@ -1133,9 +1127,27 @@ def segment_list(mol_id):
     sn=0
   return list_out
   
+def segment_list_chain(mol_id,ch_id):
+  sn=0
+  list_out=[]
+  while is_polymer_residue(mol_id,ch_id,sn+1)==1:
+    if sn==0:
+      res_start=seqnum_from_serial_number(mol_id,ch_id,sn)
+      while is_term_type_mc_sn(mol_id,ch_id,sn)==0 and seqnum_from_serial_number(mol_id,ch_id,sn+1)!=-10000 and is_polymer_residue(mol_id,ch_id,sn+1)==1:
+        sn=sn+1
+      res_end=seqnum_from_serial_number(mol_id,ch_id,sn)
+      list_out.append([mol_id,ch_id,res_start,res_end])
+    else:
+      while is_term_type_mn_sn(mol_id,ch_id,sn)==0:
+        sn=sn+1
+      res_start=seqnum_from_serial_number(mol_id,ch_id,sn)
+      while is_term_type_mc_sn(mol_id,ch_id,sn)==0 and seqnum_from_serial_number(mol_id,ch_id,sn+1)!=-10000 and is_polymer_residue(mol_id,ch_id,sn+1)==1:
+        sn=sn+1
+      res_end=seqnum_from_serial_number(mol_id,ch_id,sn)
+      list_out.append([mol_id,ch_id,res_start,res_end])
+  return list_out
   
     
-  
 #rigid body refine zone here +/- n+1, then real space refine zone here +/-n
 def auto_refine(n):
   mol_id=active_residue()[0]
