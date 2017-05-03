@@ -969,22 +969,28 @@ def is_last_polymer_residue_sn(mol_id,ch_id,sn):
 
 #get serial number from resnum
 def get_sn_from_resno(mol_id,ch_id,resno):
-  if resno>0:
-    sn=resno
-  else:
-    sn=chain_n_residues(ch_id,mol_id)
-  resno_out=0
+  sn=chain_n_residues(ch_id,mol_id)-1
+  sn2=0
+  resno_out=""
+  resno_out_2=""
   if resno>last_residue(mol_id,ch_id) or resno<first_residue(mol_id,ch_id):
+    return -1
+  elif does_residue_exist_p(mol_id,ch_id,resno,"")==0:
     return -1
   elif resno==first_residue(mol_id,ch_id):
     return 0
   elif resno==chain_n_residues(ch_id,mol_id):
     return chain_n_residues(ch_id,mol_id)
   else:
-    while (resno_out!=resno):
+    while (resno_out!=resno) and (resno_out_2!=resno):
       resno_out=seqnum_from_serial_number(mol_id,ch_id,sn)
+      resno_out_2=seqnum_from_serial_number(mol_id,ch_id,sn2)
       sn=sn-1
-    return sn+1
+      sn2=sn+1
+    if resno_out_2==resno:
+      return int(sn2+1)
+    else:
+      return int(sn+1)
 
   
 #check if res is at C-term side of break in mid chain
@@ -1002,7 +1008,7 @@ def is_term_type_mc(mol_id,ch_id,resno):
     return 0
     
 
-#check if res is at N-term side of break in mid chain
+#check if res is at C-term side of break in mid chain
 def is_term_type_mc_sn(mol_id,ch_id,sn):
   if sn in range(1,chain_n_residues(ch_id,mol_id)):
     resn_here=seqnum_from_serial_number(mol_id,ch_id,sn)
@@ -2866,7 +2872,7 @@ def add_term_shortcut_force_strand():
   resn=active_residue()[2]
   first_in_seg=first_residue_in_seg(mol_id,ch_id,resn)
   last_in_seg=last_residue_in_seg(mol_id,ch_id,resn)
-  delta_first=abs(first_in_seg-resn)
+  delta_first=abs(first_in_seg-resn) 
   delta_last=abs(last_in_seg-resn)
   set_new_atom_b_fac_to_mean()
   if delta_first<=delta_last:
