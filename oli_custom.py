@@ -967,24 +967,44 @@ def is_last_polymer_residue_sn(mol_id,ch_id,sn):
   else:
     return -1
 
+#get serial number from resnum
 def get_sn_from_resno(mol_id,ch_id,resno):
+  sn=chain_n_residues(ch_id,mol_id)-1
+  sn2=0
+  resno_out=""
+  resno_out_2=""
+  if resno>last_residue(mol_id,ch_id) or resno<first_residue(mol_id,ch_id):
+    return -1
+  elif does_residue_exist_p(mol_id,ch_id,resno,"")==0:
+    return -1
+  elif resno==first_residue(mol_id,ch_id):
+    return 0
+  elif resno==chain_n_residues(ch_id,mol_id):
+    return chain_n_residues(ch_id,mol_id)
+  else:
+    while (resno_out!=resno) and (resno_out_2!=resno):
+      resno_out=seqnum_from_serial_number(mol_id,ch_id,sn)
+      resno_out_2=seqnum_from_serial_number(mol_id,ch_id,sn2)
+      sn=sn-1
+      sn2=sn+1
+    if resno_out_2==resno:
+      return int(sn2+1)
+    else:
+      return int(sn+1)
+
+def get_sn_from_resno_alt(mol_id,ch_id,resno):
   sn=0
   sn_max=chain_n_residues(ch_id,mol_id)-1
   sn_dict={}
-  if (seqnum_from_serial_number(mol_id,ch_id,sn)==resno):
-    return sn
-  elif (seqnum_from_serial_number(mol_id,ch_id,sn_max)==resno):
-    return sn_max
-  else:
-    while sn<=sn_max:
-      resno_here=seqnum_from_serial_number(mol_id,ch_id,sn)
-      sn_dict[resno_here]=sn
-      sn=sn+1
-    try:
-      sn_out=sn_dict[resno]
-      return sn_out
-    except KeyError:
-      return -1
+  while sn<=sn_max:
+    resno_here=seqnum_from_serial_number(mol_id,ch_id,sn)
+    sn_dict[resno_here]=sn
+    sn=sn+1
+  try:
+    sn_out=sn_dict[resno]
+    return sn_out
+  except KeyError:
+    return -1
 
 #check if res is at C-term side of break in mid chain
 def is_term_type_mc(mol_id,ch_id,resno):
@@ -1050,8 +1070,6 @@ def is_term_type_mn_sn(mol_id,ch_id,sn):
     return 0
   
 #Check for last residue in active segment  
-#goes into endless loop if fed res no before first res in ch
-#gives incorrect value if fed last res in ch
 def last_residue_in_seg(mol_id,ch_id,current_res_no):
   if current_res_no==last_polymer_residue(mol_id,ch_id) or is_term_type_mc(mol_id,ch_id,current_res_no):
     output=current_res_no
