@@ -1373,6 +1373,10 @@ def rebuild_backbone_wrapper():
         print("target seq:",target_seq)
         mutate_residue_range(new_mol_id,ch_id,res1_rsr,res2_rsr,target_seq)
         delete_sidechain_range(new_mol_id,ch_id,res1_rsr,res2_rsr)
+        for res in range(res1_rsr,res2_rsr+1):
+          if residue_name(new_mol_id,ch_id,res,"")=="PRO":
+            target_seq="P"
+            mutate_residue_range(new_mol_id,ch_id,res,res,target_seq)
         #cut out orginal region and merge in new fragment?
         refine_zone(new_mol_id,ch_id,res1_rsr,res2_rsr,"")
         accept_regularizement()
