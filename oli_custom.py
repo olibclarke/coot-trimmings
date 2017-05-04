@@ -371,7 +371,7 @@ def next_res():
   mol_id=active_residue()[0]
   ch_id=active_residue()[1]
   resn=active_residue()[2]
-  sn=sn_of_active_res()
+  sn=get_sn_from_resno(mol_id,ch_id,resn)
   next_sn=sn+1
   next_res=seqnum_from_serial_number(mol_id,"%s"%(ch_id),next_sn)
   if (next_res!=-10000 and is_protein_chain_p(mol_id,ch_id)==1):
@@ -384,7 +384,7 @@ def prev_res():
   mol_id=active_residue()[0]
   ch_id=active_residue()[1]
   resn=active_residue()[2]
-  sn=sn_of_active_res()
+  sn=get_sn_from_resno(mol_id,ch_id,resn)
   if (sn>=1):
     sn=sn-1
   prev_res=seqnum_from_serial_number(mol_id,"%s"%(ch_id),sn)
