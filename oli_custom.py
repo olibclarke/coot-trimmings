@@ -19,13 +19,6 @@ set_rotamer_search_mode(ROTAMERSEARCHLOWRES)
 #Use ramachandran restraints in real space refinement
 set_refine_ramachandran_angles(1)
 
-#Display probe dots etc as solid, if option to do so available. 
-try:
-  set_display_generic_objects_as_solid(0)
-except NameError:
-  info_dialog("Sorry, you don't seem to have this func. Maybe you have an old Coot?")
-  pass
-
 #Use finer map sampling
 set_map_sampling_rate(2.0)
 
@@ -60,7 +53,7 @@ set_active_map_drag_flag(0)
 #set rotation speed for spin
 set_idle_function_rotate_angle(1.5)
 
-#Default to not showing environment distances, anf only showing h-bonds if shown
+#Default to not showing environment distances, and only showing h-bonds if shown
 set_show_environment_distances(0)
 set_show_environment_distances_bumps(0)
 set_show_environment_distances_h_bonds(1)
@@ -78,7 +71,7 @@ set_default_temperature_factor_for_new_atoms(50.0)
 set_add_terminal_residue_do_post_refine(1)
 set_terminal_residue_do_rigid_body_refine(0)
 
-#real spece refine after mutating residue
+#real space refine after mutating residue
 set_mutate_auto_fit_do_post_refine(1)
 
 #Don't change contour level with scroll wheel (use +/- and shift+1-9 instead)
@@ -1355,32 +1348,39 @@ def fit_polyala_gui():
 #   user_defined_click(2,fit_polyala)
 
 #Rebuild backbone in selected zone
-# def rebuild_backbone_wrapper():
-#   def rebuild_backbone(res1,res2):
-#     if res1[1]==res2[1] and res1[2]==res2[2]: #if residues in same mol and chain
-#       mol_id=res1[1]
-#       ch_id=res1[2]
-#       resid1=res1[3]
-#       resid2=res2[3]
-#       if resid1>resid2:
-#         new_mol_id=db_mainchain(mol_id,ch_id,resid2,resid1,"forwards")
-#         accept_regularizement()
-#         res1_rsr=first_residue(new_mol_id)
-#         res2_rsr=last_residue(new_mol_id)
-#         refine_zone(new_mol_id,ch_id,res1_rsr,res2_rsr,"")
-#         accept_regularizement()
-#       elif resid1<resid2:
-#         new_mol_id=db_mainchain(mol_id,ch_id,resid1,resid2,"forwards")
-#         accept_regularizement()
-#         res1_rsr=first_residue(new_mol_id,ch_id)
-#         res2_rsr=last_residue(new_mol_id,ch_id)
-#         refine_zone(new_mol_id,ch_id,res1_rsr,res2_rsr,"")
-#         accept_regularizement()
-#       else:
-#         info_dialog("Sorry, you need at least 2 residues in a zone!")
-#     else:
-#       info_dialog("Sorry, residues must be in same mol and chain!")
-#   user_defined_click(2,rebuild_backbone)
+def rebuild_backbone_wrapper():
+  def rebuild_backbone(res1,res2):
+    if res1[1]==res2[1] and res1[2]==res2[2]: #if residues in same mol and chain
+      mol_id=res1[1]
+      ch_id=res1[2]
+      resid1=res1[3]
+      resid2=res2[3]
+      if resid1!=resid2:
+        if resid2<resid1:
+          resid1, resid2 = resid2, resid1
+        new_mol_id=db_mainchain(mol_id,ch_id,resid1,resid2,"forwards")
+        accept_regularizement()
+        res1_rsr=first_residue(new_mol_id,ch_id)
+        res2_rsr=last_residue(new_mol_id,ch_id)
+        #need to mutate each residue to appropriate sidechain and kill sidechain
+        #get target seq with aa_code=three_letter_code2single_letter(residue_name(mol_id,ch_id,resnum,ins_code))
+        #mutate_residue_range
+        #delete_sidechain_range
+        target_seq=""
+        for res in range(res1_rsr,res2_rsr+1):
+          aa_code=three_letter_code2single_letter(residue_name(new_mol_id,ch_id,res,""))
+          target_seq=target_seq+aa_code
+        print("target seq:",target_seq)
+        mutate_residue_range(new_mol_id,ch_id,res1_rsr,res2_rsr,target_seq)
+        delete_sidechain_range(new_mol_id,ch_id,res1_rsr,res2_rsr)
+        #cut out orginal region and merge in new fragment?
+        refine_zone(new_mol_id,ch_id,res1_rsr,res2_rsr,"")
+        accept_regularizement()
+      else:
+        info_dialog("Sorry, you need at least 2 residues in a zone!")
+    else:
+      info_dialog("Sorry, residues must be in same mol and chain!")
+  user_defined_click(2,rebuild_backbone)
 
 
 #Real space refine for keyboard shortcut
@@ -3313,6 +3313,9 @@ add_simple_coot_menu_menuitem(submenu_build, "Make alkyl chain of length n", lam
 add_simple_coot_menu_menuitem(submenu_build, "Make alpha helix of length n", lambda func: place_new_helix()) 
 
 add_simple_coot_menu_menuitem(submenu_build, "Make 3-10 helix of length n", lambda func: place_new_3_10_helix())
+
+add_simple_coot_menu_menuitem(submenu_build, "Rebuld backbone (click start,end)", lambda func: rebuild_backbone_wrapper())
+
 
 
 
