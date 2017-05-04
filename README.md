@@ -8,3 +8,11 @@ You should see a new menu ("Custom") and a bunch of new key bindings, as well as
 Email me if you run into any trouble (olibclarke at gmail dot com).
 
 I haven't tested most of these on WinCoot, or on older versions of Coot. Most testing done with Coot 0.8.8 or later.
+
+Also, many of the functions here haven't been tested on molecules with insertion codes. If this is important to you, let me know and I'll fix.
+
+# Non-standard setttings
+
+# Custom keybindings
+
+# Custom menu items
