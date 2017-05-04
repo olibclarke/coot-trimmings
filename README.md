@@ -12,9 +12,13 @@ I haven't tested most of these on WinCoot, or on older versions of Coot. Most te
 Also, many of the functions here haven't been tested on molecules with insertion codes. If this is important to you, let me know and I'll fix.
 
 # Non-standard setttings
+To be added
 
 # Custom keybindings
+To be added
 
 # Custom menu items
+To be added
 
 # Toolbar buttons
+To be added
