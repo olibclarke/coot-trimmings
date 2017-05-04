@@ -16,3 +16,5 @@ Also, many of the functions here haven't been tested on molecules with insertion
 # Custom keybindings
 
 # Custom menu items
+
+# Toolbar buttons
