@@ -13,19 +13,23 @@ Also, many of the functions here haven't been tested on molecules with insertion
 
 # Non-default setttings
 
-`set_symmetry_colour(255,35,0)`
+  set_symmetry_colour(255,35,0)
 Makes sym copies brighter (yellow), rather than grey.
 
 `set_refine_max_residues(100)`
+
 Increases max number of residues included in a refinement.
 
 `set_rotamer_search_mode(ROTAMERSEARCHLOWRES)`
+
 Use "backrub" rotamers (better at low res).
 
 `set_refine_ramachandran_angles(1)`
+
 Turn ramachandran restraints on by default during real space refinement
 
 `set_map_sampling_rate(2.0)`
+
 Increase map  sampling a bit for nicer looking maps.
 
 `allow_duplicate_sequence_numbers()`
