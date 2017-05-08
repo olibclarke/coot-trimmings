@@ -191,43 +191,43 @@ Ordered approximately by interestingness/usefulness. YMMV.
 # Custom menu items
 (Very incomplete list - these are some highlights)
 
-## Display
+## _Display_
 * Colour by rotamer probability/missing atomsl; hydrophobics/polars; +ve/-ve charge; entered subset of residues
 * Highlight chainbreaks with dotted lines; red >50 residues, orange 15-50 residues missing, gray <15 residues missing
 * Open current view in UCSF chimera (requires chimera in PATH): Hopefully does what it says on the box, including changing view and display of maps. Useful as a starting point for making density figures.
 
-## Renumber
+## _Renumber_
 * Renumber active chain by current res: Adjusts sequence numbering of chain so that active residue matches entered number.
 * Renumber active segment (contiguous stretch of sequence, bounded by chain breaks) by current res: Adjusts sequence numbering of segment so that active residue matches entered number. Checks for overlapping numbering.
 
-## Settings
+## _Settings_
 * Auto-scale B-factor coloring
 * Change default B for new residues to mean B of active model.
 
-## Build
+## _Build_
 * Forced addition of terminal residue: adds residue, ignoring map, for when you disagree with Coot's assessment of residue placeability.
 * Rebuild backbone: Uses db_mainchain to rebuild the selected zone based on similar sequence fragments in a database of high resolution structures.
 * Make alkyl chain of length n: Makes alkyl chain and jiggle-fits to map. Useful for preliminary modelling of lipids/detergents.
 * Grow helix, grow strand etc. Grows selected helix/strand by entered number of residues assuming ideal geometry.
 
-## Mutate
+## _Mutate_
 * Mutate range to ALA
 * Mutate range to UNK
 * Mutate Mets to MSE and vice-versa
 * Mutate active chain to template sequence: Mutates active chain to sequence pasted into textbox, assuming numbering the same - i.e. first residue in pasted sequence is residue 1 in numbering scheme of model. Filters non-sequence (e.g. formatting) characters from pasted sequence. Once sequence is pasted once, it is remembered after, to speed up multiple register adjustments.
 
-## Copy
+## _Copy_
 * Cut/copy chain, segment, selected fragment, etc.
 
-## Delete
+## _Delete_
 * Delete active chain
 * Delete sidechains in range
 * Delete hydrogens in active molecule
 
-## Merge
+## _Merge_
 * Merge two molecules or chains by clicking.
 
-## Maps
+## _Maps_
 * Sharpen by entered B-factor. Absolute not relative; 0 always returns to original map. (MTZ only!)
 * Change hi-res-limit for map; creates low-pass filtered version of active map (MTZ only!)
 * Go to center of active map.
