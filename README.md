@@ -14,6 +14,8 @@ Also, many of the functions here haven't been tested on molecules with insertion
 # Custom keybindings
 Ordered approximately by interestingness/usefulness. YMMV.
 
+NEW "L": Set contour level of scrollable map in sigma by entering a new value.
+
 "M": Mutate active residue by entered single letter code (case-insensitive).
 
 "?": Display only active model; If only active model displayed, cycle display of models.
