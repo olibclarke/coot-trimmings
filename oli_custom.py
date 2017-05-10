@@ -25,16 +25,6 @@ set_map_sampling_rate(2.0)
 #Allow duplicate sequence numbers (otherwise some PDBs won't load)
 allow_duplicate_sequence_numbers()
 
-#When rendering using raster 3D, make waters spherical rather than cross shaped.
-#Would be useful to do this for ions also, but such an option does not exist.
-#Also, don't use shadows - they look ugly with density maps.
-set_raster3d_water_sphere(1)
-set_raster3d_shadows_enabled(0)
-
-#Display probe dots when picking rotamers. Unfortunately they persist after
-#rotamer selection - I don't know how to globally undisplay probe dots.
-set_do_probe_dots_on_rotamers_and_chis(1)
-
 #Increase number of trials for add terminal residue
 set_add_terminal_residue_n_phi_psi_trials(1000)
 
@@ -49,9 +39,6 @@ set_smooth_scroll_flag(0)
 
 #Update map after dragging - improves speed with large map radius
 set_active_map_drag_flag(0)
-
-#set rotation speed for spin
-set_idle_function_rotate_angle(1.5)
 
 #Default to not showing environment distances, and only showing h-bonds if shown
 set_show_environment_distances(0)
@@ -212,6 +199,10 @@ lambda: toggle_mol_display())
 #Clear distances/labels
 add_key_binding("Clear distances and labels","Z",
 lambda: clear_distances_and_labels())
+
+#Shortcut to set map level in sigma (useful for EM maps)
+add_key_binding("Set map contour in sigma","L",
+lambda: set_map_level_quickly())
 
 #Show local sequence context for active residue
 coot_toolbar_button("Sequence context",
@@ -411,6 +402,18 @@ def mutate_by_entered_code():
     else:
       info_dialog("Invalid target residue! Must be protein or nucleic acid, and entered code must be single letter.")
   generic_single_entry("New residue? (single letter code)","A","Mutate by single-letter code",mutate_single_letter)
+  
+def set_map_level_quickly():
+  if scroll_wheel_map()!=-1 and map_is_displayed(scroll_wheel_map())!=0:
+    current_map_level=get_contour_level_in_sigma(scroll_wheel_map())
+    current_map_level="{0:.2f}".format(current_map_level)
+    def set_map_level_quickly(X):
+      map_level=float(X)
+      map_id=scroll_wheel_map()
+      set_contour_level_in_sigma(map_id, map_level) 
+    generic_single_entry("New map level in sigma/RMS?",current_map_level,"Set map level",set_map_level_quickly)
+  else:
+    info_dialog("You need a (scrollable, displayed) map!")
   
 def sequence_context():
   mol_id=active_residue()[0]
