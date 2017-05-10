@@ -408,9 +408,12 @@ def set_map_level_quickly():
     current_map_level=get_contour_level_in_sigma(scroll_wheel_map())
     current_map_level="{0:.2f}".format(current_map_level)
     def set_map_level_quickly(X):
-      map_level=float(X)
-      map_id=scroll_wheel_map()
-      set_contour_level_in_sigma(map_id, map_level) 
+      try:
+        map_level=float(X)
+        map_id=scroll_wheel_map()
+        set_contour_level_in_sigma(map_id, map_level)
+      except ValueError:
+        info_dialog("Has to be a number!") 
     generic_single_entry("New map level in sigma/RMS?",current_map_level,"Set map level",set_map_level_quickly)
   else:
     info_dialog("You need a (scrollable, displayed) map!")
