@@ -3004,6 +3004,39 @@ def return_seq_as_string(mol_id,ch_id):
       aa_code="X"
     seq=seq+aa_code
   return seq
+
+stereo_gif_counter=1
+def make_rot_gif():
+  if find_exe("convert"):
+    global stereo_gif_counter
+    import subprocess
+    pwd=os.getcwd()
+    set_rotation_center_size(0)
+    set_draw_axes(0)
+    rotate_y_scene(1,-2)
+    screendump_image("{pwd}/pair1_tmp.ppm".format(pwd=pwd))
+    rotate_y_scene(1,1)
+    screendump_image("{pwd}/pair2_tmp.ppm".format(pwd=pwd))
+    rotate_y_scene(1,1)
+    screendump_image("{pwd}/pair3_tmp.ppm".format(pwd=pwd))
+    rotate_y_scene(1,1)
+    screendump_image("{pwd}/pair4_tmp.ppm".format(pwd=pwd))
+    rotate_y_scene(1,1)
+    screendump_image("{pwd}/pair5_tmp.ppm".format(pwd=pwd))
+    rotate_y_scene(1,-2)
+    p=subprocess.Popen("convert -scale 500 -normalize -fuzz 5% -delay 8 -loop 0 -layers Optimize {pwd}/pair1_tmp.ppm {pwd}/pair2_tmp.ppm {pwd}/pair3_tmp.ppm {pwd}/pair4_tmp.ppm {pwd}/pair5_tmp.ppm {pwd}/pair4_tmp.ppm {pwd}/pair3_tmp.ppm {pwd}/pair2_tmp.ppm {pwd}/stereo_density_{stereo_gif_counter}.gif".format(pwd=pwd,stereo_gif_counter=stereo_gif_counter),shell=True) 
+    p.communicate()
+    stereo_gif_counter=stereo_gif_counter+1
+    os.remove("{pwd}/pair1_tmp.ppm".format(pwd=pwd))
+    os.remove("{pwd}/pair2_tmp.ppm".format(pwd=pwd))
+    os.remove("{pwd}/pair3_tmp.ppm".format(pwd=pwd))
+    os.remove("{pwd}/pair4_tmp.ppm".format(pwd=pwd))
+    os.remove("{pwd}/pair5_tmp.ppm".format(pwd=pwd))
+    set_rotation_center_size(0.1)
+    set_draw_axes(1)
+  else:
+    info_dialog("You need Imagemagick to use this!")
+    
     
 def find_sequence_in_current_chain(subseq):
   subseq=subseq.upper()
@@ -3063,7 +3096,7 @@ def find_sequence_in_current_chain(subseq):
 
 def find_sequence_with_entry():
   generic_single_entry("Enter sequence fragment to find",
-  "MAAAA","Find sequence",find_sequence_in_current_chain)
+  "MAAAA","Find sequence in active chain",find_sequence_in_current_chain)
 
       
 
@@ -3219,7 +3252,9 @@ add_simple_coot_menu_menuitem(submenu_display, "Show global probe dots (bad over
 
 add_simple_coot_menu_menuitem(submenu_display, "Clear probe dots", lambda func: clear_dots())
 
-add_simple_coot_menu_menuitem(submenu_display, "Find sequence", lambda func: find_sequence_with_entry())
+add_simple_coot_menu_menuitem(submenu_display, "Find sequence in active chain", lambda func: find_sequence_with_entry())
+
+add_simple_coot_menu_menuitem(submenu_display, "Make stereo-wiggle GIF of current scenre (Needs ImageMagick!)", lambda func: make_rot_gif())
 
 
 
