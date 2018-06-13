@@ -584,10 +584,19 @@ def color_by_cablam2(mol_id):
     file_name=molecule_name(mol_id)
     file_name_output=coot_cablam_path+"mol_{mol_id}_cablam_output.txt".format(mol_id=mol_id) #this file will have info on cablam outliers
 #     write_pdb_file(mol_id,file_name) # write a copy of the active mol to the cablam dir
-    p=subprocess.Popen("phenix.cablam_validate {file_name} outlier_cutoff=0.005 | awk '{{FS=\":\"}} {{print $1,$2}}' | sed 's/CaBLAM Outlier/1/g' | sed 's/CaBLAM Disfavored/2/g' | sed 's/CA Geom Outlier/3/g' | sed 's/[0123456789-]/ &/' > {file_name_output}".format(file_name=file_name,file_name_output=file_name_output),shell=True)
+    p=subprocess.Popen("phenix.cablam_validate {file_name} outlier_cutoff=0.01 | tail -n +2 | awk '{{FS=\":\"}} {{print $1,$2,$5}}' | sed 's/CaBLAM Outlier/1/g' | sed 's/CaBLAM Disfavored/2/g' | sed 's/CA Geom Outlier/3/g' | sed 's/try alpha helix/4/g' | sed 's/try beta sheet/5/g' | sed 's/try three-ten/6/g' | sed 's/[0123456789-]/ &/' > {file_name_output}".format(file_name=file_name,file_name_output=file_name_output),shell=True)
     p.communicate() #wait for cablam to finish
     cablam_outlier_list=[]
-    cablam_outlier_colour=34
+    cablam_beta_list=[]
+    cablam_alpha_list=[]
+    cablam_3_10_list=[]
+    cablam_disfavored_list=[]
+    cablam_outlier_colour=30
+    cablam_disfavored_colour=27
+    cablam_alpha_colour=10
+    cablam_beta_colour=39
+    cablam_3_10_colour=15
+    cablam_ca_geom_colour=10
     blank_colour=0
     outlier_flag=0
     with open(file_name_output) as f:
@@ -601,8 +610,23 @@ def color_by_cablam2(mol_id):
           resname=line_list[2]
           if len(line_list)>3:
             outlier_flag=int(line_list[3]) #1 is Cablam outlier 2 is cablam disfavored, and 3 is ca geom outlier
-            if outlier_flag==1: #Only look at CaBLAM outliers
+            if outlier_flag==1: #CaBLAM outliers
               cablam_outlier_colour_spec=[([ch_id,resid,ins_id],cablam_outlier_colour)]
+              cablam_outlier_list=cablam_outlier_list+cablam_outlier_colour_spec
+            elif outlier_flag==2: #CaBLAM disfavored
+              cablam_outlier_colour_spec=[([ch_id,resid,ins_id],cablam_disfavored_colour)]
+              cablam_outlier_list=cablam_outlier_list+cablam_outlier_colour_spec
+            elif outlier_flag==1: #CaBLAM disfavored
+              cablam_outlier_colour_spec=[([ch_id,resid,ins_id],cablam_ca_geom_colour)]
+              cablam_outlier_list=cablam_outlier_list+cablam_outlier_colour_spec
+            elif outlier_flag==4: #alpha
+              cablam_outlier_colour_spec=[([ch_id,resid,ins_id],cablam_alpha_colour)]
+              cablam_outlier_list=cablam_outlier_list+cablam_outlier_colour_spec
+            elif outlier_flag==5: #beta
+              cablam_outlier_colour_spec=[([ch_id,resid,ins_id],cablam_beta_colour)]
+              cablam_outlier_list=cablam_outlier_list+cablam_outlier_colour_spec
+            elif outlier_flag==6: #3-10 helix
+              cablam_outlier_colour_spec=[([ch_id,resid,ins_id],cablam_3_10_colour)]
               cablam_outlier_list=cablam_outlier_list+cablam_outlier_colour_spec
             else:
               cablam_outlier_colour_spec=[([ch_id,resid,ins_id],blank_colour)]
@@ -615,6 +639,7 @@ def color_by_cablam2(mol_id):
     try:
       set_user_defined_atom_colour_by_residue_py(mol_id,cablam_outlier_list)
       graphics_to_user_defined_atom_colours_representation(mol_id)
+      info_dialog("CaBLAM coloring scheme (predicted SS and outliers): \n  \n Teal = alpha \n \n Green = 3-10 \n \n Purple = beta \n \n Yellow = Ca geometry outlier \n \n Orange = CaBLAM disfavored (5% cutoff) \n \n Red = CaBLAM outlier (1% cutoff)")
     except NameError:
       info_dialog("You need a newer Coot - custom coloring is only in r6174 and later, sorry.")
       pass
@@ -2201,6 +2226,34 @@ def color_active_chain():
   ch_id_here=active_residue()[1]  
   blank_colour=0
   chain_colour=22 #yellow
+  blank_res_list=[]
+  chain_res_list=[]
+  for ch_id in chain_ids(mol_id):
+    sn_max=chain_n_residues(ch_id,mol_id)
+    if ch_id!=ch_id_here:
+      for sn in range(0,sn_max+1):
+        resn=seqnum_from_serial_number(mol_id,ch_id,sn)
+        ins_id=str(insertion_code_from_serial_number(mol_id,ch_id,sn))
+        residue_to_color=[([ch_id,resn,ins_id],blank_colour)]
+        blank_res_list=blank_res_list+residue_to_color
+    if ch_id==ch_id_here:
+      for sn in range(0,sn_max+1):
+        resn=seqnum_from_serial_number(mol_id,ch_id,sn)
+        ins_id=str(insertion_code_from_serial_number(mol_id,ch_id,sn))
+        residue_to_color=[([ch_id,resn,ins_id],chain_colour)]
+        chain_res_list=chain_res_list+residue_to_color
+  try:
+    set_user_defined_atom_colour_by_residue_py(mol_id,blank_res_list)
+    set_user_defined_atom_colour_by_residue_py(mol_id,chain_res_list)
+    graphics_to_user_defined_atom_colours_representation(mol_id)
+  except NameError:
+    info_dialog("You need a newer Coot - custom coloring is only in r6174 and later, sorry.")
+    pass
+
+def color_active_chain_by_num(chain_colour):
+  mol_id=active_residue()[0]
+  ch_id_here=active_residue()[1]
+  blank_colour=0
   blank_res_list=[]
   chain_res_list=[]
   for ch_id in chain_ids(mol_id):
