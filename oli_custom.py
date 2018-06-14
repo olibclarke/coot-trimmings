@@ -575,6 +575,51 @@ def open_in_chimera():
 #Hmmm
 #Doesn't work when attempting to open second set of maps loaded, when first set is undisplayed... Fixed! (I think)
 
+
+def color_emringer_outliers(mol_id,map_id):
+  if find_exe("phenix.emringer"):
+    import subprocess
+    import sys
+    mmtbx_path=find_exe("phenix")[:-16]+"modules/cctbx_project/"
+    sys.path.insert(0,mmtbx_path)
+    import mmtbx
+    import cPickle as pickle
+    pwd=os.getcwd()
+    model_name=molecule_name(mol_id)
+    map_name=molecule_name(map_id)
+    make_directory_maybe("coot-emringer")
+    coot_emringer_path=pwd+"/coot-emringer/"
+    output_file_name=coot_emringer_path+"mol_{mol_id}_cablam_output.txt".format(mol_id=mol_id)
+    p=subprocess.Popen("phenix.emringer {model_name} {map_name}".format(model_name=model_name,map_name=map_name),shell=True)
+    p.communicate()
+    emringer_outlier_list=[]
+    emringer_outlier_color=30
+    emringer_outlier_pkl=pwd+"/"+molecule_name_stub(mol_id,2)+"_emringer_plots/Outliers.pkl"
+    outlier_string=str(pickle.load(open(emringer_outlier_pkl,"rb")))
+    with open(output_file_name,"a") as outlier_file: 
+      outlier_file.write(outlier_string)
+    with open(output_file_name) as f:
+      emringer_output = [x.strip('\n') for x in f.readlines()] #make a list of lines in cablam output file, stripping newlines
+      for line in emringer_output:
+        line_list=line.split()
+        if len(line_list)>=5:
+          ch_id=str(line_list[2]) # string.split() defaults to splitting by spaces and making into a list
+          print("ch_id:",ch_id)
+          resid=int(line_list[1]) #If second column has trailing letters (as it will if there is an insertion code) then strip them
+          print("resid",resid)
+          ins_id=""
+          emringer_outlier_color_spec=[([ch_id,resid,ins_id],emringer_outlier_color)]
+          emringer_outlier_list=emringer_outlier_list+emringer_outlier_color_spec
+      print("outlier_list",emringer_outlier_list)
+      try:
+        set_user_defined_atom_colour_by_residue_py(mol_id,emringer_outlier_list)
+        graphics_to_user_defined_atom_colours_representation(mol_id)
+      except NameError:
+        info_dialog("You need a newer Coot - custom coloring is only in r6174 and later, sorry.")
+        pass
+  else:
+    info_dialog("Sorry, you need phenix.cablam_validate, sed and awk installed and accessible from the terminal for this to work!")
+
 def color_by_cablam2(mol_id):
   if find_exe("phenix.cablam_validate") and find_exe("awk") and find_exe("sed"):
     import subprocess
@@ -3286,6 +3331,9 @@ add_simple_coot_menu_menuitem(submenu_display, "Colour entered subset of protein
 
 add_simple_coot_menu_menuitem(submenu_display,
 "Color active mol by CaBLAM outliers (blue) (needs phenix)", lambda func: color_by_cablam2(active_residue()[0]))
+
+add_simple_coot_menu_menuitem(submenu_display,
+"Color active mol by EMringer outliers (red) (needs phenix)", lambda func: color_emringer_outliers(active_residue()[0],scroll_wheel_map()))
 
 add_simple_coot_menu_menuitem(submenu_display,
 "Color active mol by ramachandran outliers (blue) (needs phenix)", lambda func: color_by_rama(active_residue()[0]))
