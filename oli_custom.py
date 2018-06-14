@@ -616,7 +616,7 @@ def color_by_cablam2(mol_id):
             elif outlier_flag==2: #CaBLAM disfavored
               cablam_outlier_colour_spec=[([ch_id,resid,ins_id],cablam_disfavored_colour)]
               cablam_outlier_list=cablam_outlier_list+cablam_outlier_colour_spec
-            elif outlier_flag==1: #CaBLAM disfavored
+            elif outlier_flag==3: #CaBLAM disfavored
               cablam_outlier_colour_spec=[([ch_id,resid,ins_id],cablam_ca_geom_colour)]
               cablam_outlier_list=cablam_outlier_list+cablam_outlier_colour_spec
             elif outlier_flag==4: #alpha
