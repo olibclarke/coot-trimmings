@@ -149,8 +149,8 @@ add_key_binding("Add terminal residue","y",
 lambda: add_term_shortcut())
  
 #add terminal residue
-add_key_binding("Grow helix","Y",
-lambda: add_term_shortcut_force())
+add_key_binding("Cycle terminus phi/psi","Y",
+lambda: cycle_residue_phi_psi())
 
 #add terminal residue
 add_key_binding("Grow strand","T",
@@ -1724,6 +1724,16 @@ def force_add_terminal_residue_noclick(mol_id,ch_id,res_no):
     set_b_factor_residue_range(mol_id,ch_id,res_no-1,res_no-1,default_new_atoms_b_factor())
   sort_residues(mol_id)
 
+def force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,res_no,phi,psi):
+  res_type="auto"
+  add_terminal_residue_using_phi_psi(mol_id,ch_id,res_no,
+  res_type,float(phi),float(psi))
+  if residue_exists_qm(mol_id,ch_id,res_no+1,""):
+    set_b_factor_residue_range(mol_id,ch_id,res_no+1,res_no+1,default_new_atoms_b_factor())
+  elif residue_exists_qm(mol_id,ch_id,res_no-1,""):
+    set_b_factor_residue_range(mol_id,ch_id,res_no-1,res_no-1,default_new_atoms_b_factor())
+  sort_residues(mol_id)
+
 def force_add_terminal_residue_noclick_strand(mol_id,ch_id,res_no):
   res_type="auto"
   add_terminal_residue_using_phi_psi(mol_id,ch_id,res_no,
@@ -1733,6 +1743,172 @@ def force_add_terminal_residue_noclick_strand(mol_id,ch_id,res_no):
   elif residue_exists_qm(mol_id,ch_id,res_no-1,""):
     set_b_factor_residue_range(mol_id,ch_id,res_no-1,res_no-1,default_new_atoms_b_factor())
   sort_residues(mol_id)
+
+residue_phi_psi_cycle=0
+def cycle_residue_phi_psi():
+  global residue_phi_psi_cycle
+  res_type="auto"
+  mol_id=active_residue()[0]
+  ch_id=active_residue()[1]
+  resn=active_residue()[2]
+  ins_code=""
+  first_in_seg=first_residue_in_seg(mol_id,ch_id,resn)
+  last_in_seg=last_residue_in_seg(mol_id,ch_id,resn)
+  delta_first=abs(first_in_seg-resn)
+  delta_last=abs(last_in_seg-resn)
+  set_new_atom_b_fac_to_mean()
+  if delta_first<=delta_last:
+    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+    if (residue_phi_psi_cycle==0):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=-58
+      psi=-47
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+      residue_phi_psi_cycle=1
+    elif (residue_phi_psi_cycle==1):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=-139
+      psi=135
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+      residue_phi_psi_cycle=2
+    elif (residue_phi_psi_cycle==2):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=-74
+      psi=-4
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+      residue_phi_psi_cycle=3
+    elif (residue_phi_psi_cycle==3):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=-57
+      psi=-70
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+      residue_phi_psi_cycle=4
+    elif (residue_phi_psi_cycle==4):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=-60
+      psi=-30
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+      residue_phi_psi_cycle=5
+    elif (residue_phi_psi_cycle==5):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=-90
+      psi=0
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+      residue_phi_psi_cycle=6
+    elif (residue_phi_psi_cycle==6):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=-60
+      psi=120
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+      residue_phi_psi_cycle=7
+    elif (residue_phi_psi_cycle==7):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=90
+      psi=0
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+      residue_phi_psi_cycle=0
+  else:
+    if (residue_phi_psi_cycle==0):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=-58
+      psi=-47
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+      residue_phi_psi_cycle=1
+    elif (residue_phi_psi_cycle==1):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=-139
+      psi=135
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+      residue_phi_psi_cycle=2
+    elif (residue_phi_psi_cycle==2):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=-74
+      psi=-4
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+      residue_phi_psi_cycle=3
+    elif (residue_phi_psi_cycle==3):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=-57
+      psi=-70
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+      residue_phi_psi_cycle=4
+    elif (residue_phi_psi_cycle==4):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=-60
+      psi=-30
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+      residue_phi_psi_cycle=5
+    elif (residue_phi_psi_cycle==5):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=-90
+      psi=0
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+      residue_phi_psi_cycle=6
+    elif (residue_phi_psi_cycle==6):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=-60
+      psi=120
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+      residue_phi_psi_cycle=7
+    elif (residue_phi_psi_cycle==7):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=90
+      psi=0
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+      residue_phi_psi_cycle=0
+def add_term_shortcut_force():
+  mol_id=active_residue()[0]
+  ch_id=active_residue()[1]
+  resn=active_residue()[2]
+  first_in_seg=first_residue_in_seg(mol_id,ch_id,resn)
+  last_in_seg=last_residue_in_seg(mol_id,ch_id,resn)
+  delta_first=abs(first_in_seg-resn)
+  delta_last=abs(last_in_seg-resn)
+  set_new_atom_b_fac_to_mean()
+  if delta_first<=delta_last:
+    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+    force_add_terminal_residue_noclick(mol_id,ch_id,first_in_seg)
+    sort_residues(mol_id)
+    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg-1,"CA")
+  else:
+    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,"CA")
+    force_add_terminal_residue_noclick(mol_id,ch_id,last_in_seg)
+    sort_residues(mol_id)
+    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg+1,"CA")
+
+
 
 #Grow helix from selected terminus
 def grow_helix():
