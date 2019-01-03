@@ -16,7 +16,7 @@ Ordered approximately by interestingness/usefulness. YMMV.
 
 NEW "L": Set contour level of scrollable map in sigma by entering a new value.
 
-NEW "Y": Cycle backbone torsions of terminal residue. Useful when manually buiulding in conjunction with "y"
+NEW "Y"/"T": Cycle phi/psi angles of terminal residue. Useful when manually buiulding in conjunction with "y"
 
 "M": Mutate active residue by entered single letter code (case-insensitive).
 
@@ -31,8 +31,6 @@ NEW "Y": Cycle backbone torsions of terminal residue. Useful when manually buiul
 "]"/"[": Cycle representation mode forward/back for active model.
 
 "}"/"{": Cycle symmetry representation mode forward/back for active model.
-
-"T": Grow strand by one residue (ignores maps).
 
 "R": Cycle through rotamers for active residue.
 
@@ -74,7 +72,7 @@ NEW "Y": Cycle backbone torsions of terminal residue. Useful when manually buiul
 
 "y": Add terminal residue.
 
-"r": Refine active residue.
+"r": Refine three residues centered on active residue.
 
 "V": Undo symmetry view.
 
