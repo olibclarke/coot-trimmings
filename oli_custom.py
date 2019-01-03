@@ -1786,6 +1786,7 @@ def cycle_residue_phi():
   mol_id=active_residue()[0]
   ch_id=active_residue()[1]
   resn=active_residue()[2]
+  atom_name=active_residue()[4]
   ins_code=""
   first_in_seg=first_residue_in_seg(mol_id,ch_id,resn)
   last_in_seg=last_residue_in_seg(mol_id,ch_id,resn)
@@ -1793,104 +1794,184 @@ def cycle_residue_phi():
   delta_last=abs(last_in_seg-resn)
   set_new_atom_b_fac_to_mean()
   if delta_first<=delta_last:
-    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
     if (residue_phi_cycle==0):
       delete_residue(mol_id,ch_id,resn,ins_code)
       phi=-180
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       residue_phi_cycle=1
     elif (residue_phi_cycle==1):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=-150
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_phi_cycle=2
+    elif (residue_phi_cycle==2):
       delete_residue(mol_id,ch_id,resn,ins_code)
       phi=-120
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
-      residue_phi_cycle=2
-    elif (residue_phi_cycle==2):
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_phi_cycle=3
+    elif (residue_phi_cycle==3):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=-90
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_phi_cycle=4
+    elif (residue_phi_cycle==4):
       delete_residue(mol_id,ch_id,resn,ins_code)
       phi=-60
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
-      residue_phi_cycle=3
-    elif (residue_phi_cycle==3):
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_phi_cycle=5
+    elif (residue_phi_cycle==5):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=-30
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_phi_cycle=6
+    elif (residue_phi_cycle==6):
       delete_residue(mol_id,ch_id,resn,ins_code)
       phi=0
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
-      residue_phi_cycle=4
-    elif (residue_phi_cycle==4):
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_phi_cycle=7
+    elif (residue_phi_cycle==7):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=30
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_phi_cycle=8
+    elif (residue_phi_cycle==8):
       delete_residue(mol_id,ch_id,resn,ins_code)
       phi=60
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
-      residue_phi_cycle=5
-    elif (residue_phi_cycle==5):
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_phi_cycle=9
+    elif (residue_phi_cycle==9):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=90
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_phi_cycle=10
+    elif (residue_phi_cycle==10):
       delete_residue(mol_id,ch_id,resn,ins_code)
       phi=120
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       residue_phi_cycle=0
   else:
-    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,"CA")
+    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
     if (residue_phi_cycle==0):
       delete_residue(mol_id,ch_id,resn,ins_code)
       phi=-180
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,"CA")
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       residue_phi_cycle=1
     elif (residue_phi_cycle==1):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=-150
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_phi_cycle=2
+    elif (residue_phi_cycle==2):
       delete_residue(mol_id,ch_id,resn,ins_code)
       phi=-120
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,"CA")
-      residue_phi_cycle=2
-    elif (residue_phi_cycle==2):
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_phi_cycle=3
+    elif (residue_phi_cycle==3):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=-90
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_phi_cycle=4
+    elif (residue_phi_cycle==4):
       delete_residue(mol_id,ch_id,resn,ins_code)
       phi=-60
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,"CA")
-      residue_phi_cycle=3
-    elif (residue_phi_cycle==3):
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_phi_cycle=5
+    elif (residue_phi_cycle==5):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=-30
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_phi_cycle=6
+    elif (residue_phi_cycle==6):
       delete_residue(mol_id,ch_id,resn,ins_code)
       phi=0
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,"CA")
-      residue_phi_cycle=4
-    elif (residue_phi_cycle==4):
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_phi_cycle=7
+    elif (residue_phi_cycle==7):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=30
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_phi_cycle=8
+    elif (residue_phi_cycle==8):
       delete_residue(mol_id,ch_id,resn,ins_code)
       phi=60
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,"CA")
-      residue_phi_cycle=5
-    elif (residue_phi_cycle==5):
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_phi_cycle=9
+    elif (residue_phi_cycle==9):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=90
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_phi_cycle=10
+    elif (residue_phi_cycle==10):
       delete_residue(mol_id,ch_id,resn,ins_code)
       phi=120
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,"CA")
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       residue_phi_cycle=0
   current_phi=phi
 def cycle_residue_psi():
@@ -1901,6 +1982,7 @@ def cycle_residue_psi():
   mol_id=active_residue()[0]
   ch_id=active_residue()[1]
   resn=active_residue()[2]
+  atom_name=active_residue()[4]
   ins_code=""
   first_in_seg=first_residue_in_seg(mol_id,ch_id,resn)
   last_in_seg=last_residue_in_seg(mol_id,ch_id,resn)
@@ -1908,104 +1990,184 @@ def cycle_residue_psi():
   delta_last=abs(last_in_seg-resn)
   set_new_atom_b_fac_to_mean()
   if delta_first<=delta_last:
-    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
     if (residue_psi_cycle==0):
       delete_residue(mol_id,ch_id,resn,ins_code)
       phi=current_phi
       psi=-180
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       residue_psi_cycle=1
     elif (residue_psi_cycle==1):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=current_phi
+      psi=-150
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_psi_cycle=2
+    elif (residue_psi_cycle==2):
       delete_residue(mol_id,ch_id,resn,ins_code)
       phi=current_phi
       psi=-120
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
-      residue_psi_cycle=2
-    elif (residue_psi_cycle==2):
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_psi_cycle=3
+    elif (residue_psi_cycle==3):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=current_phi
+      psi=-90
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_psi_cycle=4
+    elif (residue_psi_cycle==4):
       delete_residue(mol_id,ch_id,resn,ins_code)
       phi=current_phi
       psi=-60
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
-      residue_psi_cycle=3
-    elif (residue_psi_cycle==3):
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_psi_cycle=5
+    elif (residue_psi_cycle==5):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=current_phi
+      psi=-30
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_psi_cycle=6
+    elif (residue_psi_cycle==6):
       delete_residue(mol_id,ch_id,resn,ins_code)
       phi=current_phi
       psi=0
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
-      residue_psi_cycle=4
-    elif (residue_psi_cycle==4):
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_psi_cycle=7
+    elif (residue_psi_cycle==7):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=current_phi
+      psi=30
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_psi_cycle=8
+    elif (residue_psi_cycle==8):
       delete_residue(mol_id,ch_id,resn,ins_code)
       phi=current_phi
       psi=60
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
-      residue_psi_cycle=5
-    elif (residue_psi_cycle==5):
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_psi_cycle=9
+    elif (residue_psi_cycle==9):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=current_phi
+      psi=90
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_psi_cycle=10
+    elif (residue_psi_cycle==10):
       delete_residue(mol_id,ch_id,resn,ins_code)
       phi=current_phi
       psi=120
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       residue_psi_cycle=0
   else:
-    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,"CA")
+    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
     if (residue_psi_cycle==0):
       delete_residue(mol_id,ch_id,resn,ins_code)
       phi=current_phi
       psi=-180
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,"CA")
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       residue_psi_cycle=1
     elif (residue_psi_cycle==1):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=current_phi
+      psi=-150
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_psi_cycle=2
+    elif (residue_psi_cycle==2):
       delete_residue(mol_id,ch_id,resn,ins_code)
       phi=current_phi
       psi=-120
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,"CA")
-      residue_psi_cycle=2
-    elif (residue_psi_cycle==2):
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_psi_cycle=3
+    elif (residue_psi_cycle==3):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=current_phi
+      psi=-90
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_psi_cycle=4
+    elif (residue_psi_cycle==4):
       delete_residue(mol_id,ch_id,resn,ins_code)
       phi=current_phi
       psi=-60
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,"CA")
-      residue_psi_cycle=3
-    elif (residue_psi_cycle==3):
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_psi_cycle=5
+    elif (residue_psi_cycle==5):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=current_phi
+      psi=-30
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_psi_cycle=6
+    elif (residue_psi_cycle==6):
       delete_residue(mol_id,ch_id,resn,ins_code)
       phi=current_phi
       psi=0
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,"CA")
-      residue_psi_cycle=4
-    elif (residue_psi_cycle==4):
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_psi_cycle=7
+    elif (residue_psi_cycle==7):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=current_phi
+      psi=30
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_psi_cycle=8
+    elif (residue_psi_cycle==8):
       delete_residue(mol_id,ch_id,resn,ins_code)
       phi=current_phi
       psi=60
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,"CA")
-      residue_psi_cycle=5
-    elif (residue_psi_cycle==5):
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_psi_cycle=9
+    elif (residue_psi_cycle==9):
+      delete_residue(mol_id,ch_id,resn,ins_code)
+      phi=current_phi
+      psi=90
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_psi_cycle=10
+    elif (residue_psi_cycle==10):
       delete_residue(mol_id,ch_id,resn,ins_code)
       phi=current_phi
       psi=120
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,"CA")
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       residue_psi_cycle=0
   current_psi=psi
 
