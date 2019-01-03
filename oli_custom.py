@@ -158,8 +158,8 @@ lambda: add_term_shortcut_force_strand())
 
  
 #Refine active residue
-add_key_binding("Refine Active Residue","r",
-lambda: manual_refine_residues(0))
+add_key_binding("Refine Triple","r",
+lambda: key_binding_refine_triple())
 
 #Undo Symm view
 add_key_binding("Undo Symmetry View", "V",
@@ -883,6 +883,23 @@ def cycle_rep_down(mol_id,flag):
     graphics_to_rainbow_representation(mol_id)
     cycle_rep_flag[mol_id]=3
 
+
+#Refine triple (Paul)
+def key_binding_refine_triple():
+    active_atom = active_residue()
+    if not active_atom:
+       print("No active atom")
+    else:
+       imol = active_atom[0]
+       residue_spec = atom_spec_to_residue_spec(active_atom)
+       N_terminal_residue_spec = [residue_spec_to_chain_id(residue_spec),
+                                  residue_spec_to_res_no(residue_spec)-1,
+                                  residue_spec_to_ins_code(residue_spec)]
+       C_terminal_residue_spec = [residue_spec_to_chain_id(residue_spec),
+                                  residue_spec_to_res_no(residue_spec)+1,
+                                  residue_spec_to_ins_code(residue_spec)]
+       spec_list = [N_terminal_residue_spec, residue_spec, C_terminal_residue_spec]
+       refine_residues(imol, spec_list)
     
 #Cycle symmetry represntation mode forward/back
 cycle_symm_flag={0:0}
