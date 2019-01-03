@@ -153,8 +153,8 @@ add_key_binding("Cycle terminus phi/psi","Y",
 lambda: cycle_residue_phi_psi())
 
 #add terminal residue
-add_key_binding("Grow strand","T",
-lambda: add_term_shortcut_force_strand())
+add_key_binding("Spin terminus","T",
+lambda: key_binding_terminal_spin())
 
  
 #Refine active residue
@@ -1760,6 +1760,17 @@ def force_add_terminal_residue_noclick_strand(mol_id,ch_id,res_no):
   elif residue_exists_qm(mol_id,ch_id,res_no-1,""):
     set_b_factor_residue_range(mol_id,ch_id,res_no-1,res_no-1,default_new_atoms_b_factor())
   sort_residues(mol_id)
+
+#Paul
+def key_binding_terminal_spin():
+    active_atom = active_residue()
+    if not active_atom:
+       print("No active atom")
+    else:
+       imol = active_atom[0]
+       residue_spec = atom_spec_to_residue_spec(active_atom)
+       print ('spin_N {} {} {}'.format(imol, residue_spec, 120))
+       spin_N_py(imol, residue_spec, 120)
 
 residue_phi_psi_cycle=0
 def cycle_residue_phi_psi():
