@@ -1796,7 +1796,7 @@ def cycle_residue_phi():
   if delta_first<=delta_last:
     set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
     if (residue_phi_cycle==0):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
       phi=-180
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
@@ -1804,7 +1804,7 @@ def cycle_residue_phi():
       set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       residue_phi_cycle=1
     elif (residue_phi_cycle==1):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
       phi=-150
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
@@ -1812,7 +1812,7 @@ def cycle_residue_phi():
       set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       residue_phi_cycle=2
     elif (residue_phi_cycle==2):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
       phi=-120
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
@@ -1820,7 +1820,7 @@ def cycle_residue_phi():
       set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       residue_phi_cycle=3
     elif (residue_phi_cycle==3):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
       phi=-90
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
@@ -1828,7 +1828,7 @@ def cycle_residue_phi():
       set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       residue_phi_cycle=4
     elif (residue_phi_cycle==4):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
       phi=-60
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
@@ -1836,7 +1836,7 @@ def cycle_residue_phi():
       set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       residue_phi_cycle=5
     elif (residue_phi_cycle==5):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
       phi=-30
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
@@ -1844,7 +1844,7 @@ def cycle_residue_phi():
       set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       residue_phi_cycle=6
     elif (residue_phi_cycle==6):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
       phi=0
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
@@ -1852,7 +1852,7 @@ def cycle_residue_phi():
       set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       residue_phi_cycle=7
     elif (residue_phi_cycle==7):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
       phi=30
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
@@ -1860,7 +1860,7 @@ def cycle_residue_phi():
       set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       residue_phi_cycle=8
     elif (residue_phi_cycle==8):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
       phi=60
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
@@ -1868,7 +1868,7 @@ def cycle_residue_phi():
       set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       residue_phi_cycle=9
     elif (residue_phi_cycle==9):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
       phi=90
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
@@ -1876,7 +1876,7 @@ def cycle_residue_phi():
       set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       residue_phi_cycle=10
     elif (residue_phi_cycle==10):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
       phi=120
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
@@ -1886,7 +1886,7 @@ def cycle_residue_phi():
   else:
     set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
     if (residue_phi_cycle==0):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
       phi=-180
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
@@ -1894,7 +1894,7 @@ def cycle_residue_phi():
       set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       residue_phi_cycle=1
     elif (residue_phi_cycle==1):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
       phi=-150
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
@@ -1902,7 +1902,7 @@ def cycle_residue_phi():
       set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       residue_phi_cycle=2
     elif (residue_phi_cycle==2):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
       phi=-120
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
@@ -1910,7 +1910,7 @@ def cycle_residue_phi():
       set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       residue_phi_cycle=3
     elif (residue_phi_cycle==3):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
       phi=-90
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
@@ -1918,7 +1918,7 @@ def cycle_residue_phi():
       set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       residue_phi_cycle=4
     elif (residue_phi_cycle==4):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
       phi=-60
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
@@ -1926,7 +1926,7 @@ def cycle_residue_phi():
       set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       residue_phi_cycle=5
     elif (residue_phi_cycle==5):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
       phi=-30
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
@@ -1934,7 +1934,7 @@ def cycle_residue_phi():
       set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       residue_phi_cycle=6
     elif (residue_phi_cycle==6):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
       phi=0
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
@@ -1942,7 +1942,7 @@ def cycle_residue_phi():
       set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       residue_phi_cycle=7
     elif (residue_phi_cycle==7):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
       phi=30
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
@@ -1950,7 +1950,7 @@ def cycle_residue_phi():
       set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       residue_phi_cycle=8
     elif (residue_phi_cycle==8):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
       phi=60
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
@@ -1958,7 +1958,7 @@ def cycle_residue_phi():
       set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       residue_phi_cycle=9
     elif (residue_phi_cycle==9):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
       phi=90
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
@@ -1966,7 +1966,7 @@ def cycle_residue_phi():
       set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       residue_phi_cycle=10
     elif (residue_phi_cycle==10):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
       phi=120
       psi=current_psi
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
@@ -1992,7 +1992,7 @@ def cycle_residue_psi():
   if delta_first<=delta_last:
     set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
     if (residue_psi_cycle==0):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
       phi=current_phi
       psi=-180
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
@@ -2000,7 +2000,7 @@ def cycle_residue_psi():
       set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       residue_psi_cycle=1
     elif (residue_psi_cycle==1):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
       phi=current_phi
       psi=-150
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
@@ -2008,7 +2008,7 @@ def cycle_residue_psi():
       set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       residue_psi_cycle=2
     elif (residue_psi_cycle==2):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
       phi=current_phi
       psi=-120
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
@@ -2016,7 +2016,7 @@ def cycle_residue_psi():
       set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       residue_psi_cycle=3
     elif (residue_psi_cycle==3):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
       phi=current_phi
       psi=-90
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
@@ -2024,7 +2024,7 @@ def cycle_residue_psi():
       set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       residue_psi_cycle=4
     elif (residue_psi_cycle==4):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
       phi=current_phi
       psi=-60
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
@@ -2032,7 +2032,7 @@ def cycle_residue_psi():
       set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       residue_psi_cycle=5
     elif (residue_psi_cycle==5):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
       phi=current_phi
       psi=-30
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
@@ -2040,7 +2040,7 @@ def cycle_residue_psi():
       set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       residue_psi_cycle=6
     elif (residue_psi_cycle==6):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
       phi=current_phi
       psi=0
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
@@ -2048,7 +2048,7 @@ def cycle_residue_psi():
       set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       residue_psi_cycle=7
     elif (residue_psi_cycle==7):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
       phi=current_phi
       psi=30
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
@@ -2056,7 +2056,7 @@ def cycle_residue_psi():
       set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       residue_psi_cycle=8
     elif (residue_psi_cycle==8):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
       phi=current_phi
       psi=60
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
@@ -2064,7 +2064,7 @@ def cycle_residue_psi():
       set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       residue_psi_cycle=9
     elif (residue_psi_cycle==9):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
       phi=current_phi
       psi=90
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
@@ -2072,7 +2072,7 @@ def cycle_residue_psi():
       set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       residue_psi_cycle=10
     elif (residue_psi_cycle==10):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
       phi=current_phi
       psi=120
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
@@ -2082,7 +2082,7 @@ def cycle_residue_psi():
   else:
     set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
     if (residue_psi_cycle==0):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
       phi=current_phi
       psi=-180
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
@@ -2090,7 +2090,7 @@ def cycle_residue_psi():
       set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       residue_psi_cycle=1
     elif (residue_psi_cycle==1):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
       phi=current_phi
       psi=-150
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
@@ -2098,7 +2098,7 @@ def cycle_residue_psi():
       set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       residue_psi_cycle=2
     elif (residue_psi_cycle==2):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
       phi=current_phi
       psi=-120
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
@@ -2106,7 +2106,7 @@ def cycle_residue_psi():
       set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       residue_psi_cycle=3
     elif (residue_psi_cycle==3):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
       phi=current_phi
       psi=-90
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
@@ -2114,7 +2114,7 @@ def cycle_residue_psi():
       set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       residue_psi_cycle=4
     elif (residue_psi_cycle==4):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
       phi=current_phi
       psi=-60
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
@@ -2122,7 +2122,7 @@ def cycle_residue_psi():
       set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       residue_psi_cycle=5
     elif (residue_psi_cycle==5):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
       phi=current_phi
       psi=-30
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
@@ -2130,7 +2130,7 @@ def cycle_residue_psi():
       set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       residue_psi_cycle=6
     elif (residue_psi_cycle==6):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
       phi=current_phi
       psi=0
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
@@ -2138,7 +2138,7 @@ def cycle_residue_psi():
       set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       residue_psi_cycle=7
     elif (residue_psi_cycle==7):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
       phi=current_phi
       psi=30
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
@@ -2146,7 +2146,7 @@ def cycle_residue_psi():
       set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       residue_psi_cycle=8
     elif (residue_psi_cycle==8):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
       phi=current_phi
       psi=60
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
@@ -2154,7 +2154,7 @@ def cycle_residue_psi():
       set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       residue_psi_cycle=9
     elif (residue_psi_cycle==9):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
       phi=current_phi
       psi=90
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
@@ -2162,7 +2162,7 @@ def cycle_residue_psi():
       set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       residue_psi_cycle=10
     elif (residue_psi_cycle==10):
-      delete_residue(mol_id,ch_id,resn,ins_code)
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
       phi=current_phi
       psi=120
       force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
