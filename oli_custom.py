@@ -285,6 +285,7 @@ def goto_ncs_master():
   resno=active_residue()[2]
   atom_name=active_residue()[4]
   ncs_ch_id=ncs_master_chain_id(mol_id)
+  set_go_to_atom_molecule(mol_id)
   set_go_to_atom_chain_residue_atom_name(ncs_ch_id,resno,atom_name)
 add_key_binding("Go to NCS master chain","O",
 lambda: goto_ncs_master())
@@ -2182,6 +2183,8 @@ def add_term_shortcut_force():
   mol_id=active_residue()[0]
   ch_id=active_residue()[1]
   resn=active_residue()[2]
+  atom_name=active_residue()[4]
+  set_go_to_atom_molecule(mol_id)
   first_in_seg=first_residue_in_seg(mol_id,ch_id,resn)
   last_in_seg=last_residue_in_seg(mol_id,ch_id,resn)
   delta_first=abs(first_in_seg-resn)
@@ -3451,19 +3454,18 @@ def add_term_shortcut_force():
   ch_id=active_residue()[1]
   resn=active_residue()[2]
   atom_name=active_residue()[4]
+  set_go_to_atom_molecule(mol_id)
   first_in_seg=first_residue_in_seg(mol_id,ch_id,resn)
   last_in_seg=last_residue_in_seg(mol_id,ch_id,resn)
   delta_first=abs(first_in_seg-resn)
   delta_last=abs(last_in_seg-resn)
   set_new_atom_b_fac_to_mean()
   if delta_first<=delta_last:
-    set_go_to_atom_molecule(mol_id)
     set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
     force_add_terminal_residue_noclick(mol_id,ch_id,first_in_seg)
     sort_residues(mol_id)
     set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg-1,atom_name)
   else:
-    set_go_to_atom_molecule(mol_id)
     set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
     force_add_terminal_residue_noclick(mol_id,ch_id,last_in_seg)
     sort_residues(mol_id)
@@ -3474,19 +3476,18 @@ def add_term_shortcut_force_strand():
   ch_id=active_residue()[1]
   resn=active_residue()[2]
   atom_name=active_residue()[4]
+  set_go_to_atom_molecule(mol_id)
   first_in_seg=first_residue_in_seg(mol_id,ch_id,resn)
   last_in_seg=last_residue_in_seg(mol_id,ch_id,resn)
   delta_first=abs(first_in_seg-resn) 
   delta_last=abs(last_in_seg-resn)
   set_new_atom_b_fac_to_mean()
   if delta_first<=delta_last:
-    set_go_to_atom_molecule(mol_id)
     set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
     force_add_terminal_residue_noclick_strand(mol_id,ch_id,first_in_seg)
     sort_residues(mol_id)
     set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg-1,atom_name)
   else:
-    set_go_to_atom_molecule(mol_id)
     set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
     force_add_terminal_residue_noclick_strand(mol_id,ch_id,last_in_seg)
     sort_residues(mol_id)
