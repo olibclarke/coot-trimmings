@@ -362,27 +362,31 @@ def next_res():
   mol_id=active_residue()[0]
   ch_id=active_residue()[1]
   resn=active_residue()[2]
+  atom_name=active_residue()[4]
   sn=get_sn_from_resno(mol_id,ch_id,resn)
   next_sn=sn+1
   next_res=seqnum_from_serial_number(mol_id,"%s"%(ch_id),next_sn)
+  set_go_to_atom_molecule(mol_id)
   if (next_res!=-10000 and is_protein_chain_p(mol_id,ch_id)==1):
-    set_go_to_atom_chain_residue_atom_name(ch_id,next_res,"CA")
+    set_go_to_atom_chain_residue_atom_name(ch_id,next_res,atom_name)
   elif (next_res!=-10000 and is_nucleotide_chain_p(mol_id,ch_id)==1):
-    set_go_to_atom_chain_residue_atom_name(ch_id,next_res,"P")
+    set_go_to_atom_chain_residue_atom_name(ch_id,next_res,atom_name)
 
 #Go to previous residue in current polymer chain.
 def prev_res():
   mol_id=active_residue()[0]
   ch_id=active_residue()[1]
   resn=active_residue()[2]
+  atom_name=active_residue()[4]
   sn=get_sn_from_resno(mol_id,ch_id,resn)
   if (sn>=1):
     sn=sn-1
   prev_res=seqnum_from_serial_number(mol_id,"%s"%(ch_id),sn)
+  set_go_to_atom_molecule(mol_id)
   if (prev_res!=-10000 and is_protein_chain_p(mol_id,ch_id)==1):
-    set_go_to_atom_chain_residue_atom_name(ch_id,prev_res,"CA")
+    set_go_to_atom_chain_residue_atom_name(ch_id,prev_res,atom_name)
   elif (prev_res!=-10000 and is_nucleotide_chain_p(mol_id,ch_id)==1):
-    set_go_to_atom_chain_residue_atom_name(ch_id,prev_res,"P")
+    set_go_to_atom_chain_residue_atom_name(ch_id,prev_res,atom_name)
 
 def mutate_by_entered_code():
   def mutate_single_letter(X):
@@ -1787,6 +1791,7 @@ def cycle_residue_phi():
   ch_id=active_residue()[1]
   resn=active_residue()[2]
   atom_name=active_residue()[4]
+  set_go_to_atom_molecule(mol_id)
   ins_code=""
   first_in_seg=first_residue_in_seg(mol_id,ch_id,resn)
   last_in_seg=last_residue_in_seg(mol_id,ch_id,resn)
@@ -1983,6 +1988,7 @@ def cycle_residue_psi():
   ch_id=active_residue()[1]
   resn=active_residue()[2]
   atom_name=active_residue()[4]
+  set_go_to_atom_molecule(mol_id)
   ins_code=""
   first_in_seg=first_residue_in_seg(mol_id,ch_id,resn)
   last_in_seg=last_residue_in_seg(mol_id,ch_id,resn)
@@ -3419,21 +3425,24 @@ def add_term_shortcut():
     mol_id=active_residue()[0]
     ch_id=active_residue()[1]
     resn=active_residue()[2]
+    atom_name=active_residue()[4]
     first_in_seg=first_residue_in_seg(mol_id,ch_id,resn)
     last_in_seg=last_residue_in_seg(mol_id,ch_id,resn)
     delta_first=abs(first_in_seg-resn)
     delta_last=abs(last_in_seg-resn)
     set_new_atom_b_fac_to_mean()
     if delta_first<=delta_last:
-      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+      set_go_to_atom_molecule(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       add_terminal_residue(mol_id,ch_id,first_in_seg,"auto",1)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg-1,"CA")
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg-1,atom_name)
     else:
-      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,"CA")
+      set_go_to_atom_molecule(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       add_terminal_residue(mol_id,ch_id,last_in_seg,"auto",1)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg+1,"CA")
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg+1,atom_name)
   else:
     info_dialog("You must set a refinement map!")
     
@@ -3441,41 +3450,47 @@ def add_term_shortcut_force():
   mol_id=active_residue()[0]
   ch_id=active_residue()[1]
   resn=active_residue()[2]
+  atom_name=active_residue()[4]
   first_in_seg=first_residue_in_seg(mol_id,ch_id,resn)
   last_in_seg=last_residue_in_seg(mol_id,ch_id,resn)
   delta_first=abs(first_in_seg-resn)
   delta_last=abs(last_in_seg-resn)
   set_new_atom_b_fac_to_mean()
   if delta_first<=delta_last:
-    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+    set_go_to_atom_molecule(mol_id)
+    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
     force_add_terminal_residue_noclick(mol_id,ch_id,first_in_seg)
     sort_residues(mol_id)
-    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg-1,"CA")
+    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg-1,atom_name)
   else:
-    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,"CA")
+    set_go_to_atom_molecule(mol_id)
+    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
     force_add_terminal_residue_noclick(mol_id,ch_id,last_in_seg)
     sort_residues(mol_id)
-    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg+1,"CA")
+    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg+1,atom_name)
     
 def add_term_shortcut_force_strand():
   mol_id=active_residue()[0]
   ch_id=active_residue()[1]
   resn=active_residue()[2]
+  atom_name=active_residue()[4]
   first_in_seg=first_residue_in_seg(mol_id,ch_id,resn)
   last_in_seg=last_residue_in_seg(mol_id,ch_id,resn)
   delta_first=abs(first_in_seg-resn) 
   delta_last=abs(last_in_seg-resn)
   set_new_atom_b_fac_to_mean()
   if delta_first<=delta_last:
-    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+    set_go_to_atom_molecule(mol_id)
+    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
     force_add_terminal_residue_noclick_strand(mol_id,ch_id,first_in_seg)
     sort_residues(mol_id)
-    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg-1,"CA")
+    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg-1,atom_name)
   else:
-    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,"CA")
+    set_go_to_atom_molecule(mol_id)
+    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
     force_add_terminal_residue_noclick_strand(mol_id,ch_id,last_in_seg)
     sort_residues(mol_id)
-    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg+1,"CA")
+    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg+1,atom_name)
 
 #Add h-bond restraints to active mol with Prosmart
 def run_prosmart_self():
