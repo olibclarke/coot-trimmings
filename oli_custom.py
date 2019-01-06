@@ -149,17 +149,17 @@ add_key_binding("Add terminal residue","y",
 lambda: add_term_shortcut())
  
 #add terminal residue
-add_key_binding("Grow helix","Y",
-lambda: add_term_shortcut_force())
+add_key_binding("Cycle terminus phi","Y",
+lambda: cycle_residue_phi())
 
 #add terminal residue
-add_key_binding("Grow strand","T",
-lambda: add_term_shortcut_force_strand())
+add_key_binding("cycle terminus psi","T",
+lambda: cycle_residue_psi())
 
  
 #Refine active residue
-add_key_binding("Refine Active Residue","r",
-lambda: manual_refine_residues(0))
+add_key_binding("Refine Triple","r",
+lambda: key_binding_refine_triple())
 
 #Undo Symm view
 add_key_binding("Undo Symmetry View", "V",
@@ -285,6 +285,7 @@ def goto_ncs_master():
   resno=active_residue()[2]
   atom_name=active_residue()[4]
   ncs_ch_id=ncs_master_chain_id(mol_id)
+  set_go_to_atom_molecule(mol_id)
   set_go_to_atom_chain_residue_atom_name(ncs_ch_id,resno,atom_name)
 add_key_binding("Go to NCS master chain","O",
 lambda: goto_ncs_master())
@@ -362,27 +363,31 @@ def next_res():
   mol_id=active_residue()[0]
   ch_id=active_residue()[1]
   resn=active_residue()[2]
+  atom_name=active_residue()[4]
   sn=get_sn_from_resno(mol_id,ch_id,resn)
   next_sn=sn+1
   next_res=seqnum_from_serial_number(mol_id,"%s"%(ch_id),next_sn)
+  set_go_to_atom_molecule(mol_id)
   if (next_res!=-10000 and is_protein_chain_p(mol_id,ch_id)==1):
-    set_go_to_atom_chain_residue_atom_name(ch_id,next_res,"CA")
+    set_go_to_atom_chain_residue_atom_name(ch_id,next_res,atom_name)
   elif (next_res!=-10000 and is_nucleotide_chain_p(mol_id,ch_id)==1):
-    set_go_to_atom_chain_residue_atom_name(ch_id,next_res,"P")
+    set_go_to_atom_chain_residue_atom_name(ch_id,next_res,atom_name)
 
 #Go to previous residue in current polymer chain.
 def prev_res():
   mol_id=active_residue()[0]
   ch_id=active_residue()[1]
   resn=active_residue()[2]
+  atom_name=active_residue()[4]
   sn=get_sn_from_resno(mol_id,ch_id,resn)
   if (sn>=1):
     sn=sn-1
   prev_res=seqnum_from_serial_number(mol_id,"%s"%(ch_id),sn)
+  set_go_to_atom_molecule(mol_id)
   if (prev_res!=-10000 and is_protein_chain_p(mol_id,ch_id)==1):
-    set_go_to_atom_chain_residue_atom_name(ch_id,prev_res,"CA")
+    set_go_to_atom_chain_residue_atom_name(ch_id,prev_res,atom_name)
   elif (prev_res!=-10000 and is_nucleotide_chain_p(mol_id,ch_id)==1):
-    set_go_to_atom_chain_residue_atom_name(ch_id,prev_res,"P")
+    set_go_to_atom_chain_residue_atom_name(ch_id,prev_res,atom_name)
 
 def mutate_by_entered_code():
   def mutate_single_letter(X):
@@ -575,6 +580,51 @@ def open_in_chimera():
 #Hmmm
 #Doesn't work when attempting to open second set of maps loaded, when first set is undisplayed... Fixed! (I think)
 
+
+def color_emringer_outliers(mol_id,map_id):
+  if find_exe("phenix.emringer"):
+    import subprocess
+    import sys
+    mmtbx_path=find_exe("phenix")[:-16]+"modules/cctbx_project/"
+    sys.path.insert(0,mmtbx_path)
+    import mmtbx
+    import cPickle as pickle
+    pwd=os.getcwd()
+    model_name=molecule_name(mol_id)
+    map_name=molecule_name(map_id)
+    make_directory_maybe("coot-emringer")
+    coot_emringer_path=pwd+"/coot-emringer/"
+    output_file_name=coot_emringer_path+"mol_{mol_id}_cablam_output.txt".format(mol_id=mol_id)
+    p=subprocess.Popen("phenix.emringer {model_name} {map_name}".format(model_name=model_name,map_name=map_name),shell=True)
+    p.communicate()
+    emringer_outlier_list=[]
+    emringer_outlier_color=30
+    emringer_outlier_pkl=pwd+"/"+molecule_name_stub(mol_id,2)+"_emringer_plots/Outliers.pkl"
+    outlier_string=str(pickle.load(open(emringer_outlier_pkl,"rb")))
+    with open(output_file_name,"a") as outlier_file: 
+      outlier_file.write(outlier_string)
+    with open(output_file_name) as f:
+      emringer_output = [x.strip('\n') for x in f.readlines()] #make a list of lines in cablam output file, stripping newlines
+      for line in emringer_output:
+        line_list=line.split()
+        if len(line_list)>=5:
+          ch_id=str(line_list[2]) # string.split() defaults to splitting by spaces and making into a list
+          print("ch_id:",ch_id)
+          resid=int(line_list[1]) #If second column has trailing letters (as it will if there is an insertion code) then strip them
+          print("resid",resid)
+          ins_id=""
+          emringer_outlier_color_spec=[([ch_id,resid,ins_id],emringer_outlier_color)]
+          emringer_outlier_list=emringer_outlier_list+emringer_outlier_color_spec
+      print("outlier_list",emringer_outlier_list)
+      try:
+        set_user_defined_atom_colour_by_residue_py(mol_id,emringer_outlier_list)
+        graphics_to_user_defined_atom_colours_representation(mol_id)
+      except NameError:
+        info_dialog("You need a newer Coot - custom coloring is only in r6174 and later, sorry.")
+        pass
+  else:
+    info_dialog("Sorry, you need phenix.cablam_validate, sed and awk installed and accessible from the terminal for this to work!")
+
 def color_by_cablam2(mol_id):
   if find_exe("phenix.cablam_validate") and find_exe("awk") and find_exe("sed"):
     import subprocess
@@ -584,10 +634,19 @@ def color_by_cablam2(mol_id):
     file_name=molecule_name(mol_id)
     file_name_output=coot_cablam_path+"mol_{mol_id}_cablam_output.txt".format(mol_id=mol_id) #this file will have info on cablam outliers
 #     write_pdb_file(mol_id,file_name) # write a copy of the active mol to the cablam dir
-    p=subprocess.Popen("phenix.cablam_validate {file_name} outlier_cutoff=0.005 | awk '{{FS=\":\"}} {{print $1,$2}}' | sed 's/CaBLAM Outlier/1/g' | sed 's/CaBLAM Disfavored/2/g' | sed 's/CA Geom Outlier/3/g' | sed 's/[0123456789-]/ &/' > {file_name_output}".format(file_name=file_name,file_name_output=file_name_output),shell=True)
+    p=subprocess.Popen("phenix.cablam_validate {file_name} outlier_cutoff=0.01 | tail -n +2 | awk '{{FS=\":\"}} {{print $1,$2,$5}}' | sed 's/CaBLAM Outlier/1/g' | sed 's/CaBLAM Disfavored/2/g' | sed 's/CA Geom Outlier/3/g' | sed 's/try alpha helix/4/g' | sed 's/try beta sheet/5/g' | sed 's/try three-ten/6/g' | sed 's/[0123456789-]/ &/' > {file_name_output}".format(file_name=file_name,file_name_output=file_name_output),shell=True)
     p.communicate() #wait for cablam to finish
     cablam_outlier_list=[]
-    cablam_outlier_colour=34
+    cablam_beta_list=[]
+    cablam_alpha_list=[]
+    cablam_3_10_list=[]
+    cablam_disfavored_list=[]
+    cablam_outlier_colour=30
+    cablam_disfavored_colour=27
+    cablam_alpha_colour=10
+    cablam_beta_colour=39
+    cablam_3_10_colour=15
+    cablam_ca_geom_colour=10
     blank_colour=0
     outlier_flag=0
     with open(file_name_output) as f:
@@ -601,8 +660,23 @@ def color_by_cablam2(mol_id):
           resname=line_list[2]
           if len(line_list)>3:
             outlier_flag=int(line_list[3]) #1 is Cablam outlier 2 is cablam disfavored, and 3 is ca geom outlier
-            if outlier_flag==1: #Only look at CaBLAM outliers
+            if outlier_flag==1: #CaBLAM outliers
               cablam_outlier_colour_spec=[([ch_id,resid,ins_id],cablam_outlier_colour)]
+              cablam_outlier_list=cablam_outlier_list+cablam_outlier_colour_spec
+            elif outlier_flag==2: #CaBLAM disfavored
+              cablam_outlier_colour_spec=[([ch_id,resid,ins_id],cablam_disfavored_colour)]
+              cablam_outlier_list=cablam_outlier_list+cablam_outlier_colour_spec
+            elif outlier_flag==3: #CaBLAM disfavored
+              cablam_outlier_colour_spec=[([ch_id,resid,ins_id],cablam_ca_geom_colour)]
+              cablam_outlier_list=cablam_outlier_list+cablam_outlier_colour_spec
+            elif outlier_flag==4: #alpha
+              cablam_outlier_colour_spec=[([ch_id,resid,ins_id],cablam_alpha_colour)]
+              cablam_outlier_list=cablam_outlier_list+cablam_outlier_colour_spec
+            elif outlier_flag==5: #beta
+              cablam_outlier_colour_spec=[([ch_id,resid,ins_id],cablam_beta_colour)]
+              cablam_outlier_list=cablam_outlier_list+cablam_outlier_colour_spec
+            elif outlier_flag==6: #3-10 helix
+              cablam_outlier_colour_spec=[([ch_id,resid,ins_id],cablam_3_10_colour)]
               cablam_outlier_list=cablam_outlier_list+cablam_outlier_colour_spec
             else:
               cablam_outlier_colour_spec=[([ch_id,resid,ins_id],blank_colour)]
@@ -615,6 +689,7 @@ def color_by_cablam2(mol_id):
     try:
       set_user_defined_atom_colour_by_residue_py(mol_id,cablam_outlier_list)
       graphics_to_user_defined_atom_colours_representation(mol_id)
+      info_dialog("CaBLAM coloring scheme (predicted SS and outliers): \n  \n Teal = alpha \n \n Green = 3-10 \n \n Purple = beta \n \n Yellow = Ca geometry outlier \n \n Orange = CaBLAM disfavored (5% cutoff) \n \n Red = CaBLAM outlier (1% cutoff)")
     except NameError:
       info_dialog("You need a newer Coot - custom coloring is only in r6174 and later, sorry.")
       pass
@@ -813,6 +888,23 @@ def cycle_rep_down(mol_id,flag):
     graphics_to_rainbow_representation(mol_id)
     cycle_rep_flag[mol_id]=3
 
+
+#Refine triple (Paul)
+def key_binding_refine_triple():
+    active_atom = active_residue()
+    if not active_atom:
+       print("No active atom")
+    else:
+       imol = active_atom[0]
+       residue_spec = atom_spec_to_residue_spec(active_atom)
+       N_terminal_residue_spec = [residue_spec_to_chain_id(residue_spec),
+                                  residue_spec_to_res_no(residue_spec)-1,
+                                  residue_spec_to_ins_code(residue_spec)]
+       C_terminal_residue_spec = [residue_spec_to_chain_id(residue_spec),
+                                  residue_spec_to_res_no(residue_spec)+1,
+                                  residue_spec_to_ins_code(residue_spec)]
+       spec_list = [N_terminal_residue_spec, residue_spec, C_terminal_residue_spec]
+       refine_residues(imol, spec_list)
     
 #Cycle symmetry represntation mode forward/back
 cycle_symm_flag={0:0}
@@ -1654,6 +1746,16 @@ def force_add_terminal_residue_noclick(mol_id,ch_id,res_no):
     set_b_factor_residue_range(mol_id,ch_id,res_no-1,res_no-1,default_new_atoms_b_factor())
   sort_residues(mol_id)
 
+def force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,res_no,phi,psi):
+  res_type="auto"
+  add_terminal_residue_using_phi_psi(mol_id,ch_id,res_no,
+  res_type,float(phi),float(psi))
+  if residue_exists_qm(mol_id,ch_id,res_no+1,""):
+    set_b_factor_residue_range(mol_id,ch_id,res_no+1,res_no+1,default_new_atoms_b_factor())
+  elif residue_exists_qm(mol_id,ch_id,res_no-1,""):
+    set_b_factor_residue_range(mol_id,ch_id,res_no-1,res_no-1,default_new_atoms_b_factor())
+  sort_residues(mol_id)
+
 def force_add_terminal_residue_noclick_strand(mol_id,ch_id,res_no):
   res_type="auto"
   add_terminal_residue_using_phi_psi(mol_id,ch_id,res_no,
@@ -1663,6 +1765,443 @@ def force_add_terminal_residue_noclick_strand(mol_id,ch_id,res_no):
   elif residue_exists_qm(mol_id,ch_id,res_no-1,""):
     set_b_factor_residue_range(mol_id,ch_id,res_no-1,res_no-1,default_new_atoms_b_factor())
   sort_residues(mol_id)
+
+#Paul
+def key_binding_terminal_spin():
+    active_atom = active_residue()
+    if not active_atom:
+       print("No active atom")
+    else:
+       imol = active_atom[0]
+       residue_spec = atom_spec_to_residue_spec(active_atom)
+       print ('spin_N {} {} {}'.format(imol, residue_spec, 120))
+       spin_N_py(imol, residue_spec, 120)
+
+#This works, but should alter to be more flexible. ideally, have one key to tweak phi, one to tweak psi.
+#Will need two global cycle variables - residue_phi_cycle and residue_psi_cycle - as well as two variables to keep the current value of phi and psi.
+residue_phi_cycle=0
+residue_psi_cycle=0
+current_phi=-60
+current_psi=-50
+def cycle_residue_phi():
+  global residue_phi_cycle
+  global current_phi
+  global current_psi
+  res_type="auto"
+  mol_id=active_residue()[0]
+  ch_id=active_residue()[1]
+  resn=active_residue()[2]
+  atom_name=active_residue()[4]
+  set_go_to_atom_molecule(mol_id)
+  ins_code=""
+  first_in_seg=first_residue_in_seg(mol_id,ch_id,resn)
+  last_in_seg=last_residue_in_seg(mol_id,ch_id,resn)
+  delta_first=abs(first_in_seg-resn)
+  delta_last=abs(last_in_seg-resn)
+  set_new_atom_b_fac_to_mean()
+  if delta_first<=delta_last:
+    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+    if (residue_phi_cycle==0):
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
+      phi=-180
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_phi_cycle=1
+    elif (residue_phi_cycle==1):
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
+      phi=-150
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_phi_cycle=2
+    elif (residue_phi_cycle==2):
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
+      phi=-120
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_phi_cycle=3
+    elif (residue_phi_cycle==3):
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
+      phi=-90
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_phi_cycle=4
+    elif (residue_phi_cycle==4):
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
+      phi=-60
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_phi_cycle=5
+    elif (residue_phi_cycle==5):
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
+      phi=-30
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_phi_cycle=6
+    elif (residue_phi_cycle==6):
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
+      phi=0
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_phi_cycle=7
+    elif (residue_phi_cycle==7):
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
+      phi=30
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_phi_cycle=8
+    elif (residue_phi_cycle==8):
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
+      phi=60
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_phi_cycle=9
+    elif (residue_phi_cycle==9):
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
+      phi=90
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_phi_cycle=10
+    elif (residue_phi_cycle==10):
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
+      phi=120
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_phi_cycle=0
+  else:
+    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+    if (residue_phi_cycle==0):
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
+      phi=-180
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_phi_cycle=1
+    elif (residue_phi_cycle==1):
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
+      phi=-150
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_phi_cycle=2
+    elif (residue_phi_cycle==2):
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
+      phi=-120
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_phi_cycle=3
+    elif (residue_phi_cycle==3):
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
+      phi=-90
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_phi_cycle=4
+    elif (residue_phi_cycle==4):
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
+      phi=-60
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_phi_cycle=5
+    elif (residue_phi_cycle==5):
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
+      phi=-30
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_phi_cycle=6
+    elif (residue_phi_cycle==6):
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
+      phi=0
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_phi_cycle=7
+    elif (residue_phi_cycle==7):
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
+      phi=30
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_phi_cycle=8
+    elif (residue_phi_cycle==8):
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
+      phi=60
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_phi_cycle=9
+    elif (residue_phi_cycle==9):
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
+      phi=90
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_phi_cycle=10
+    elif (residue_phi_cycle==10):
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
+      phi=120
+      psi=current_psi
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_phi_cycle=0
+  current_phi=phi
+def cycle_residue_psi():
+  global residue_psi_cycle
+  global current_phi
+  global current_psi
+  res_type="auto"
+  mol_id=active_residue()[0]
+  ch_id=active_residue()[1]
+  resn=active_residue()[2]
+  atom_name=active_residue()[4]
+  set_go_to_atom_molecule(mol_id)
+  ins_code=""
+  first_in_seg=first_residue_in_seg(mol_id,ch_id,resn)
+  last_in_seg=last_residue_in_seg(mol_id,ch_id,resn)
+  delta_first=abs(first_in_seg-resn)
+  delta_last=abs(last_in_seg-resn)
+  set_new_atom_b_fac_to_mean()
+  if delta_first<=delta_last:
+    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+    if (residue_psi_cycle==0):
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
+      phi=current_phi
+      psi=-180
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_psi_cycle=1
+    elif (residue_psi_cycle==1):
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
+      phi=current_phi
+      psi=-150
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_psi_cycle=2
+    elif (residue_psi_cycle==2):
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
+      phi=current_phi
+      psi=-120
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_psi_cycle=3
+    elif (residue_psi_cycle==3):
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
+      phi=current_phi
+      psi=-90
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_psi_cycle=4
+    elif (residue_psi_cycle==4):
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
+      phi=current_phi
+      psi=-60
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_psi_cycle=5
+    elif (residue_psi_cycle==5):
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
+      phi=current_phi
+      psi=-30
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_psi_cycle=6
+    elif (residue_psi_cycle==6):
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
+      phi=current_phi
+      psi=0
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_psi_cycle=7
+    elif (residue_psi_cycle==7):
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
+      phi=current_phi
+      psi=30
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_psi_cycle=8
+    elif (residue_psi_cycle==8):
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
+      phi=current_phi
+      psi=60
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_psi_cycle=9
+    elif (residue_psi_cycle==9):
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
+      phi=current_phi
+      psi=90
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_psi_cycle=10
+    elif (residue_psi_cycle==10):
+      delete_residue(mol_id,ch_id,first_in_seg,ins_code)
+      phi=current_phi
+      psi=120
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,first_in_seg+1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
+      residue_psi_cycle=0
+  else:
+    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+    if (residue_psi_cycle==0):
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
+      phi=current_phi
+      psi=-180
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_psi_cycle=1
+    elif (residue_psi_cycle==1):
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
+      phi=current_phi
+      psi=-150
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_psi_cycle=2
+    elif (residue_psi_cycle==2):
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
+      phi=current_phi
+      psi=-120
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_psi_cycle=3
+    elif (residue_psi_cycle==3):
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
+      phi=current_phi
+      psi=-90
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_psi_cycle=4
+    elif (residue_psi_cycle==4):
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
+      phi=current_phi
+      psi=-60
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_psi_cycle=5
+    elif (residue_psi_cycle==5):
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
+      phi=current_phi
+      psi=-30
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_psi_cycle=6
+    elif (residue_psi_cycle==6):
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
+      phi=current_phi
+      psi=0
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_psi_cycle=7
+    elif (residue_psi_cycle==7):
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
+      phi=current_phi
+      psi=30
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_psi_cycle=8
+    elif (residue_psi_cycle==8):
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
+      phi=current_phi
+      psi=60
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_psi_cycle=9
+    elif (residue_psi_cycle==9):
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
+      phi=current_phi
+      psi=90
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_psi_cycle=10
+    elif (residue_psi_cycle==10):
+      delete_residue(mol_id,ch_id,last_in_seg,ins_code)
+      phi=current_phi
+      psi=120
+      force_add_terminal_residue_noclick_phi_psi(mol_id,ch_id,last_in_seg-1,phi,psi)
+      sort_residues(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
+      residue_psi_cycle=0
+  current_psi=psi
+
+
+def add_term_shortcut_force():
+  mol_id=active_residue()[0]
+  ch_id=active_residue()[1]
+  resn=active_residue()[2]
+  atom_name=active_residue()[4]
+  set_go_to_atom_molecule(mol_id)
+  first_in_seg=first_residue_in_seg(mol_id,ch_id,resn)
+  last_in_seg=last_residue_in_seg(mol_id,ch_id,resn)
+  delta_first=abs(first_in_seg-resn)
+  delta_last=abs(last_in_seg-resn)
+  set_new_atom_b_fac_to_mean()
+  if delta_first<=delta_last:
+    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+    force_add_terminal_residue_noclick(mol_id,ch_id,first_in_seg)
+    sort_residues(mol_id)
+    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg-1,"CA")
+  else:
+    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,"CA")
+    force_add_terminal_residue_noclick(mol_id,ch_id,last_in_seg)
+    sort_residues(mol_id)
+    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg+1,"CA")
+
+
 
 #Grow helix from selected terminus
 def grow_helix():
@@ -2201,6 +2740,34 @@ def color_active_chain():
   ch_id_here=active_residue()[1]  
   blank_colour=0
   chain_colour=22 #yellow
+  blank_res_list=[]
+  chain_res_list=[]
+  for ch_id in chain_ids(mol_id):
+    sn_max=chain_n_residues(ch_id,mol_id)
+    if ch_id!=ch_id_here:
+      for sn in range(0,sn_max+1):
+        resn=seqnum_from_serial_number(mol_id,ch_id,sn)
+        ins_id=str(insertion_code_from_serial_number(mol_id,ch_id,sn))
+        residue_to_color=[([ch_id,resn,ins_id],blank_colour)]
+        blank_res_list=blank_res_list+residue_to_color
+    if ch_id==ch_id_here:
+      for sn in range(0,sn_max+1):
+        resn=seqnum_from_serial_number(mol_id,ch_id,sn)
+        ins_id=str(insertion_code_from_serial_number(mol_id,ch_id,sn))
+        residue_to_color=[([ch_id,resn,ins_id],chain_colour)]
+        chain_res_list=chain_res_list+residue_to_color
+  try:
+    set_user_defined_atom_colour_by_residue_py(mol_id,blank_res_list)
+    set_user_defined_atom_colour_by_residue_py(mol_id,chain_res_list)
+    graphics_to_user_defined_atom_colours_representation(mol_id)
+  except NameError:
+    info_dialog("You need a newer Coot - custom coloring is only in r6174 and later, sorry.")
+    pass
+
+def color_active_chain_by_num(chain_colour):
+  mol_id=active_residue()[0]
+  ch_id_here=active_residue()[1]
+  blank_colour=0
   blank_res_list=[]
   chain_res_list=[]
   for ch_id in chain_ids(mol_id):
@@ -2861,21 +3428,24 @@ def add_term_shortcut():
     mol_id=active_residue()[0]
     ch_id=active_residue()[1]
     resn=active_residue()[2]
+    atom_name=active_residue()[4]
     first_in_seg=first_residue_in_seg(mol_id,ch_id,resn)
     last_in_seg=last_residue_in_seg(mol_id,ch_id,resn)
     delta_first=abs(first_in_seg-resn)
     delta_last=abs(last_in_seg-resn)
     set_new_atom_b_fac_to_mean()
     if delta_first<=delta_last:
-      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+      set_go_to_atom_molecule(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
       add_terminal_residue(mol_id,ch_id,first_in_seg,"auto",1)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg-1,"CA")
+      set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg-1,atom_name)
     else:
-      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,"CA")
+      set_go_to_atom_molecule(mol_id)
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
       add_terminal_residue(mol_id,ch_id,last_in_seg,"auto",1)
       sort_residues(mol_id)
-      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg+1,"CA")
+      set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg+1,atom_name)
   else:
     info_dialog("You must set a refinement map!")
     
@@ -2883,41 +3453,45 @@ def add_term_shortcut_force():
   mol_id=active_residue()[0]
   ch_id=active_residue()[1]
   resn=active_residue()[2]
+  atom_name=active_residue()[4]
+  set_go_to_atom_molecule(mol_id)
   first_in_seg=first_residue_in_seg(mol_id,ch_id,resn)
   last_in_seg=last_residue_in_seg(mol_id,ch_id,resn)
   delta_first=abs(first_in_seg-resn)
   delta_last=abs(last_in_seg-resn)
   set_new_atom_b_fac_to_mean()
   if delta_first<=delta_last:
-    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
     force_add_terminal_residue_noclick(mol_id,ch_id,first_in_seg)
     sort_residues(mol_id)
-    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg-1,"CA")
+    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg-1,atom_name)
   else:
-    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,"CA")
+    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
     force_add_terminal_residue_noclick(mol_id,ch_id,last_in_seg)
     sort_residues(mol_id)
-    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg+1,"CA")
+    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg+1,atom_name)
     
 def add_term_shortcut_force_strand():
   mol_id=active_residue()[0]
   ch_id=active_residue()[1]
   resn=active_residue()[2]
+  atom_name=active_residue()[4]
+  set_go_to_atom_molecule(mol_id)
   first_in_seg=first_residue_in_seg(mol_id,ch_id,resn)
   last_in_seg=last_residue_in_seg(mol_id,ch_id,resn)
   delta_first=abs(first_in_seg-resn) 
   delta_last=abs(last_in_seg-resn)
   set_new_atom_b_fac_to_mean()
   if delta_first<=delta_last:
-    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,"CA")
+    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg,atom_name)
     force_add_terminal_residue_noclick_strand(mol_id,ch_id,first_in_seg)
     sort_residues(mol_id)
-    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg-1,"CA")
+    set_go_to_atom_chain_residue_atom_name(ch_id,first_in_seg-1,atom_name)
   else:
-    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,"CA")
+    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg,atom_name)
     force_add_terminal_residue_noclick_strand(mol_id,ch_id,last_in_seg)
     sort_residues(mol_id)
-    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg+1,"CA")
+    set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg+1,atom_name)
 
 #Add h-bond restraints to active mol with Prosmart
 def run_prosmart_self():
@@ -3004,6 +3578,39 @@ def return_seq_as_string(mol_id,ch_id):
       aa_code="X"
     seq=seq+aa_code
   return seq
+
+stereo_gif_counter=1
+def make_rot_gif():
+  if find_exe("convert"):
+    global stereo_gif_counter
+    import subprocess
+    pwd=os.getcwd()
+    set_rotation_center_size(0)
+    set_draw_axes(0)
+    rotate_y_scene(1,-2)
+    screendump_image("{pwd}/pair1_tmp.ppm".format(pwd=pwd))
+    rotate_y_scene(1,1)
+    screendump_image("{pwd}/pair2_tmp.ppm".format(pwd=pwd))
+    rotate_y_scene(1,1)
+    screendump_image("{pwd}/pair3_tmp.ppm".format(pwd=pwd))
+    rotate_y_scene(1,1)
+    screendump_image("{pwd}/pair4_tmp.ppm".format(pwd=pwd))
+    rotate_y_scene(1,1)
+    screendump_image("{pwd}/pair5_tmp.ppm".format(pwd=pwd))
+    rotate_y_scene(1,-2)
+    p=subprocess.Popen("convert -scale 500 -normalize -fuzz 5% -delay 8 -loop 0 -layers Optimize {pwd}/pair1_tmp.ppm {pwd}/pair2_tmp.ppm {pwd}/pair3_tmp.ppm {pwd}/pair4_tmp.ppm {pwd}/pair5_tmp.ppm {pwd}/pair4_tmp.ppm {pwd}/pair3_tmp.ppm {pwd}/pair2_tmp.ppm {pwd}/stereo_density_{stereo_gif_counter}.gif".format(pwd=pwd,stereo_gif_counter=stereo_gif_counter),shell=True) 
+    p.communicate()
+    stereo_gif_counter=stereo_gif_counter+1
+    os.remove("{pwd}/pair1_tmp.ppm".format(pwd=pwd))
+    os.remove("{pwd}/pair2_tmp.ppm".format(pwd=pwd))
+    os.remove("{pwd}/pair3_tmp.ppm".format(pwd=pwd))
+    os.remove("{pwd}/pair4_tmp.ppm".format(pwd=pwd))
+    os.remove("{pwd}/pair5_tmp.ppm".format(pwd=pwd))
+    set_rotation_center_size(0.1)
+    set_draw_axes(1)
+  else:
+    info_dialog("You need Imagemagick to use this!")
+    
     
 def find_sequence_in_current_chain(subseq):
   subseq=subseq.upper()
@@ -3063,7 +3670,7 @@ def find_sequence_in_current_chain(subseq):
 
 def find_sequence_with_entry():
   generic_single_entry("Enter sequence fragment to find",
-  "MAAAA","Find sequence",find_sequence_in_current_chain)
+  "MAAAA","Find sequence in active chain",find_sequence_in_current_chain)
 
       
 
@@ -3202,6 +3809,9 @@ add_simple_coot_menu_menuitem(submenu_display,
 "Color active mol by CaBLAM outliers (blue) (needs phenix)", lambda func: color_by_cablam2(active_residue()[0]))
 
 add_simple_coot_menu_menuitem(submenu_display,
+"Color active mol by EMringer outliers (red) (needs phenix)", lambda func: color_emringer_outliers(active_residue()[0],scroll_wheel_map()))
+
+add_simple_coot_menu_menuitem(submenu_display,
 "Color active mol by ramachandran outliers (blue) (needs phenix)", lambda func: color_by_rama(active_residue()[0]))
 
 add_simple_coot_menu_menuitem(submenu_display,
@@ -3219,7 +3829,9 @@ add_simple_coot_menu_menuitem(submenu_display, "Show global probe dots (bad over
 
 add_simple_coot_menu_menuitem(submenu_display, "Clear probe dots", lambda func: clear_dots())
 
-add_simple_coot_menu_menuitem(submenu_display, "Find sequence", lambda func: find_sequence_with_entry())
+add_simple_coot_menu_menuitem(submenu_display, "Find sequence in active chain", lambda func: find_sequence_with_entry())
+
+add_simple_coot_menu_menuitem(submenu_display, "Make stereo-wiggle GIF of current scenre (Needs ImageMagick!)", lambda func: make_rot_gif())
 
 
 

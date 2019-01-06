@@ -16,6 +16,8 @@ Ordered approximately by interestingness/usefulness. YMMV.
 
 NEW "L": Set contour level of scrollable map in sigma by entering a new value.
 
+NEW "Y"/"T": Cycle phi/psi angles of terminal residue. Useful when manually buiulding in conjunction with "y"
+
 "M": Mutate active residue by entered single letter code (case-insensitive).
 
 "?": Display only active model; If only active model displayed, cycle display of models.
@@ -29,10 +31,6 @@ NEW "L": Set contour level of scrollable map in sigma by entering a new value.
 "]"/"[": Cycle representation mode forward/back for active model.
 
 "}"/"{": Cycle symmetry representation mode forward/back for active model.
-
-"Y": Grow helix by one residue (ignores maps).
-
-"T": Grow strand by one residue (ignores maps).
 
 "R": Cycle through rotamers for active residue.
 
@@ -74,7 +72,7 @@ NEW "L": Set contour level of scrollable map in sigma by entering a new value.
 
 "y": Add terminal residue.
 
-"r": Refine active residue.
+"r": Refine three residues centered on active residue.
 
 "V": Undo symmetry view.
 
