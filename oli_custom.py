@@ -86,6 +86,10 @@ icon_name="cell+symm.svg")
 add_key_binding("Place helix here","h",
 lambda: place_helix_with_restraints())
 
+#Place 5-residue strand and refine
+add_key_binding("Place strand here","s",
+lambda: place_strand_here(5, imol_refinement_map()))
+
 #Toggle display of modelling toolbar (assumes initial state is shown)
 add_key_binding("Toggle toolbar display","H",
 lambda: toggle_toolbar_display())
