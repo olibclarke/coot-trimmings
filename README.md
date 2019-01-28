@@ -117,6 +117,7 @@ NEW "Y"/"T": Cycle phi/psi angles of terminal residue. Useful when manually buiu
 
 ## _Delete_
 * Delete active chain
+* Delete active segment
 * Delete sidechains in range
 * Delete hydrogens in active molecule
 
