@@ -1367,6 +1367,19 @@ def cut_active_segment():
       new_molecule_by_atom_selection(mol_id, "//{ch_id}/{res_start}-{res_end}/".format(ch_id=ch_id,res_start=res_start,res_end=res_end))
       delete_residue_range(mol_id,ch_id,res_start,res_end)
 
+#Delete active segment
+def delete_active_segment():
+  mol_id=active_residue()[0]
+  segments=segment_list(mol_id)
+  res_here=active_residue()[2]
+  ch_id=active_residue()[1]
+  for seg in segments:
+    if (res_here>=seg[2]) and (res_here<=seg[3]) and (ch_id==seg[1]):
+      res_start=seg[2]
+      res_end=seg[3]
+      ch_id=seg[1]
+      delete_residue_range(mol_id,ch_id,res_start,res_end)
+
 #Jiggle-fits active chain to map
 def jiggle_fit_active_chain():
   if (imol_refinement_map()==-1):
@@ -3985,6 +3998,7 @@ add_simple_coot_menu_menuitem(submenu_copy,
 #"Delete..."
 add_simple_coot_menu_menuitem(submenu_delete,
 "Delete active chain", lambda func: delete_chain())
+add_simple_coot_menu_menuitem(submenu_delete, "Delete active segment", lambda func: delete_active_segment())
 
 add_simple_coot_menu_menuitem(submenu_delete, 
 "Delete hydrogens from molecule", lambda func: delete_h_active())
