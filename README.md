@@ -90,6 +90,7 @@ NEW "Y"/"T": Cycle phi/psi angles of terminal residue. Useful when manually buiu
 ## _Display_
 * Colour by rotamer probability/missing atomsl; hydrophobics/polars; +ve/-ve charge; entered subset of residues
 * Highlight chainbreaks with dotted lines; red >50 residues, orange 15-50 residues missing, gray <15 residues missing
+* Color active segment (covalently connected polymer segment).
 * Open current view in UCSF chimera (requires chimera in PATH): Hopefully does what it says on the box, including changing view and display of maps. Useful as a starting point for making density figures.
 
 ## _Renumber_
