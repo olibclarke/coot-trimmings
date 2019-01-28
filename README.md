@@ -16,7 +16,7 @@ Ordered approximately by interestingness/usefulness. YMMV.
 
 NEW "L": Set contour level of scrollable map in sigma by entering a new value.
 
-NEW "Y"/"T": Cycle phi/psi angles of terminal residue. Useful when manually buiulding in conjunction with "y"
+NEW "Y"/"T": Cycle phi/psi angles of terminal residue. Useful when manually building in conjunction with "y"
 
 "M": Mutate active residue by entered single letter code (case-insensitive).
 
