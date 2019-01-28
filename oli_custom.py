@@ -2607,7 +2607,7 @@ def colour_active_segment():
   mol_id=active_residue()[0]
   segments=segment_list(mol_id)
   res_here=active_residue()[2]
-  ins_code=""
+  ins_code=active_residue()[3]
   ch_id=active_residue()[1]
   colour_list=[]
   blank_list=[]
