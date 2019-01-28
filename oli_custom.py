@@ -2602,6 +2602,36 @@ def color_rotamer_outliers_and_missing_atoms(mol_id):
     info_dialog("You need a newer Coot - custom coloring is only in r6174 and later, sorry.")
     pass
 
+#Colour active segment
+def colour_active_segment():
+  mol_id=active_residue()[0]
+  segments=segment_list(mol_id)
+  res_here=active_residue()[2]
+  ins_code=""
+  ch_id=active_residue()[1]
+  colour_list=[]
+  blank_list=[]
+  segment_colour=34
+  blank_colour=0
+  for seg in segments:
+    if (res_here>=seg[2]) and (res_here<=seg[3]) and (ch_id==seg[1]):
+      res_start=seg[2]
+      res_end=seg[3]
+      ch_id=seg[1]
+      for res in range(res_start,res_end+1):
+        res_color_spec=[([ch_id,res,""],segment_colour)]
+        colour_list=colour_list+res_color_spec
+    else:
+      res_start=seg[2]
+      res_end=seg[3]
+      ch_id_here=seg[1]
+      for res in range(res_start,res_end+1):
+        blank_color_spec=[([ch_id_here,res,""],blank_colour)]
+        blank_list=blank_list+blank_color_spec
+  clear_user_defined_atom_colours(mol_id)
+  set_user_defined_atom_colour_by_residue_py(mol_id,colour_list)
+  set_user_defined_atom_colour_by_residue_py(mol_id,blank_list)
+  graphics_to_user_defined_atom_colours_representation(mol_id)
 
 #Colors subset of protein residues red, provided by user as string of single-letter ids.
 def color_protein_residue_subset():
@@ -3812,6 +3842,9 @@ add_simple_coot_menu_menuitem(submenu_display,
 
 add_simple_coot_menu_menuitem(submenu_display,
 "Color active chain", lambda func: color_active_chain())
+
+add_simple_coot_menu_menuitem(submenu_display,
+"Color active segment", lambda func: colour_active_segment())
 
 add_simple_coot_menu_menuitem(submenu_display,
 "Color by protein/nucleic acid", lambda func: color_protein_na(active_residue()[0]))
