@@ -23,8 +23,10 @@ set_refine_ramachandran_angles(1)
 set_map_sampling_rate(2.0)
 
 #Allow duplicate sequence numbers (otherwise some PDBs won't load)
-allow_duplicate_sequence_numbers()
-
+try:
+  allow_duplicate_sequence_numbers()
+except NameError:
+  print("Your coot is a bit old... consider upgrading...")
 #Increase number of trials for add terminal residue
 set_add_terminal_residue_n_phi_psi_trials(1000)
 
@@ -51,11 +53,15 @@ set_environment_distances_distance_limits(2.1,3.2)
 #Set default map radius
 set_map_radius(20)
 
-#Use variable width bonds
-set_use_variable_bond_thickness(1)
-
 #Set default bond thickness
-set_default_bond_thickness(7)
+set_default_bond_thickness(3)
+
+#Use variable width bonds
+try:
+  set_use_variable_bond_thickness(1)
+  set_default_bond_thickness(7)
+except:
+  print("Your coot is a bit old... consider upgrading...")
 
 #Increase default B for new atoms
 set_default_temperature_factor_for_new_atoms(50.0)
@@ -385,7 +391,7 @@ def toggle_global_map_view():
     set_map_colour(map_id,new_colour[0],new_colour[1],new_colour[2])
     set_map_radius(max_radius)
     map_global_view_cycle_var=0
-  else:
+  elif (map_global_view_cycle_var==0) and (map_is_difference_map(map_id)==0):
     set_draw_solid_density_surface(map_id,0)
     set_draw_map_standard_lines(map_id,1)
     set_map_colour(map_id,default_colour[0],default_colour[1],default_colour[2])
