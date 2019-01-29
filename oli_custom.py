@@ -51,6 +51,12 @@ set_environment_distances_distance_limits(2.1,3.2)
 #Set default map radius
 set_map_radius(20)
 
+#Use variable width bonds
+set_use_variable_bond_thickness(1)
+
+#Set default bond thickness
+set_default_bond_thickness(7)
+
 #Increase default B for new atoms
 set_default_temperature_factor_for_new_atoms(50.0)
 
@@ -86,13 +92,13 @@ icon_name="cell+symm.svg")
 add_key_binding("Place helix here","h",
 lambda: place_helix_with_restraints())
 
-#Place 5-residue strand and refine
-add_key_binding("Place strand here","s",
-lambda: place_strand_here(5, imol_refinement_map()))
-
 #Toggle display of modelling toolbar (assumes initial state is shown)
 add_key_binding("Toggle toolbar display","H",
 lambda: toggle_toolbar_display())
+
+#Toggle display of modelling toolbar (assumes initial state is shown)
+add_key_binding("Toggle global view of map","G",
+lambda: toggle_global_map_view())
 
 
 #Quicksave active mol (overwrite orig)
@@ -361,6 +367,31 @@ def step_map_coarse_down(mol_id):
   elif (current_level>10.0):
     new_level=10.0
   set_contour_level_in_sigma(mol_id,new_level)
+
+map_global_view_cycle_var=1
+def toggle_global_map_view():
+  global map_global_view_cycle_var
+  map_id=scroll_wheel_map()
+  current_colour=get_map_colour(map_id)
+  default_colour=[0.19999998807907104, 0.38333338499069214, 0.699999988079071]
+  default_radius=20.0
+  new_colour=[0.4156862795352936, 0.6705882549285889, 0.886274516582489]
+  current_radius=get_map_radius()
+  max_radius=map_cell(map_id)[0]/2
+  if (map_global_view_cycle_var==1) and (map_is_difference_map(map_id)==0):
+    set_draw_solid_density_surface(map_id,1)
+    set_draw_map_standard_lines(map_id,0)
+    set_flat_shading_for_solid_density_surface(0)
+    set_map_colour(map_id,new_colour[0],new_colour[1],new_colour[2])
+    set_map_radius(max_radius)
+    map_global_view_cycle_var=0
+  else:
+    set_draw_solid_density_surface(map_id,0)
+    set_draw_map_standard_lines(map_id,1)
+    set_map_colour(map_id,default_colour[0],default_colour[1],default_colour[2])
+    set_map_radius(default_radius)
+    map_global_view_cycle_var=1
+    
   
 #Go to next residue in current polymer chain.
 def next_res():
@@ -1367,19 +1398,6 @@ def cut_active_segment():
       new_molecule_by_atom_selection(mol_id, "//{ch_id}/{res_start}-{res_end}/".format(ch_id=ch_id,res_start=res_start,res_end=res_end))
       delete_residue_range(mol_id,ch_id,res_start,res_end)
 
-#Delete active segment
-def delete_active_segment():
-  mol_id=active_residue()[0]
-  segments=segment_list(mol_id)
-  res_here=active_residue()[2]
-  ch_id=active_residue()[1]
-  for seg in segments:
-    if (res_here>=seg[2]) and (res_here<=seg[3]) and (ch_id==seg[1]):
-      res_start=seg[2]
-      res_end=seg[3]
-      ch_id=seg[1]
-      delete_residue_range(mol_id,ch_id,res_start,res_end)
-
 #Jiggle-fits active chain to map
 def jiggle_fit_active_chain():
   if (imol_refinement_map()==-1):
@@ -1800,6 +1818,9 @@ residue_phi_cycle=0
 residue_psi_cycle=0
 current_phi=-60
 current_psi=-50
+#should chamnge this to incorporate measurement of starting phi/psi using get_torsion (and maybe setting using set_torsion?)
+#get_torsion(0,["A",2393,""," C  ",""], ["A",2394,"", " N  ", ""], ["A", 2394, "", " CA ", ""], ["A", 2394, "", " C  ",""])
+#set_torsion(imol, chain_id, res_no, ins_code_alt_conf, atom_name_1,atom_name_2, atom_name_3, atom_name_4)
 def cycle_residue_phi():
   global residue_phi_cycle
   global current_phi
@@ -2602,36 +2623,6 @@ def color_rotamer_outliers_and_missing_atoms(mol_id):
     info_dialog("You need a newer Coot - custom coloring is only in r6174 and later, sorry.")
     pass
 
-#Colour active segment
-def colour_active_segment():
-  mol_id=active_residue()[0]
-  segments=segment_list(mol_id)
-  res_here=active_residue()[2]
-  ins_code=active_residue()[3]
-  ch_id=active_residue()[1]
-  colour_list=[]
-  blank_list=[]
-  segment_colour=34
-  blank_colour=0
-  for seg in segments:
-    if (res_here>=seg[2]) and (res_here<=seg[3]) and (ch_id==seg[1]):
-      res_start=seg[2]
-      res_end=seg[3]
-      ch_id=seg[1]
-      for res in range(res_start,res_end+1):
-        res_color_spec=[([ch_id,res,""],segment_colour)]
-        colour_list=colour_list+res_color_spec
-    else:
-      res_start=seg[2]
-      res_end=seg[3]
-      ch_id_here=seg[1]
-      for res in range(res_start,res_end+1):
-        blank_color_spec=[([ch_id_here,res,""],blank_colour)]
-        blank_list=blank_list+blank_color_spec
-  clear_user_defined_atom_colours(mol_id)
-  set_user_defined_atom_colour_by_residue_py(mol_id,colour_list)
-  set_user_defined_atom_colour_by_residue_py(mol_id,blank_list)
-  graphics_to_user_defined_atom_colours_representation(mol_id)
 
 #Colors subset of protein residues red, provided by user as string of single-letter ids.
 def color_protein_residue_subset():
@@ -3844,9 +3835,6 @@ add_simple_coot_menu_menuitem(submenu_display,
 "Color active chain", lambda func: color_active_chain())
 
 add_simple_coot_menu_menuitem(submenu_display,
-"Color active segment", lambda func: colour_active_segment())
-
-add_simple_coot_menu_menuitem(submenu_display,
 "Color by protein/nucleic acid", lambda func: color_protein_na(active_residue()[0]))
 
 
@@ -4031,7 +4019,6 @@ add_simple_coot_menu_menuitem(submenu_copy,
 #"Delete..."
 add_simple_coot_menu_menuitem(submenu_delete,
 "Delete active chain", lambda func: delete_chain())
-add_simple_coot_menu_menuitem(submenu_delete, "Delete active segment", lambda func: delete_active_segment())
 
 add_simple_coot_menu_menuitem(submenu_delete, 
 "Delete hydrogens from molecule", lambda func: delete_h_active())
