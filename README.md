@@ -14,6 +14,8 @@ Also, many of the functions here haven't been tested on molecules with insertion
 # Custom keybindings
 Ordered approximately by interestingness/usefulness. YMMV.
 
+NEW "G": Toggle display of the active map between a local mesh and a global surface.
+
 NEW "L": Set contour level of scrollable map in sigma by entering a new value.
 
 NEW "Y"/"T": Cycle phi/psi angles of terminal residue. Useful when manually building in conjunction with "y"
