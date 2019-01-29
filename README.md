@@ -1,7 +1,7 @@
 # coot-trimmings
 Python customizations for the macromolecular model building software Coot.
 
-Copy to ~/.coot-preferences (hidden dir, copy on command line) and restart coot.
+Copy python file (`oli_custom.py`) to the `~/.coot-preferences/` directory (hidden dir, copy on command line, e.g `cp oli_custom.py ~/.coot-preferences/`) and restart coot.
 
 You should see a new menu ("Custom") and a bunch of new key bindings, as well as a couple of new toolbar buttons (e.g. "sequence context").
 
