@@ -622,6 +622,38 @@ def open_in_chimera():
 #Doesn't work when attempting to open second set of maps loaded, when first set is undisplayed... Fixed! (I think)
 
 
+#Colour active segment
+def colour_active_segment():
+  mol_id=active_residue()[0]
+  segments=segment_list(mol_id)
+  res_here=active_residue()[2]
+  ins_code=active_residue()[3]
+  ch_id=active_residue()[1]
+  colour_list=[]
+  blank_list=[]
+  segment_colour=34
+  blank_colour=0
+  for seg in segments:
+    if (res_here>=seg[2]) and (res_here<=seg[3]) and (ch_id==seg[1]):
+      res_start=seg[2]
+      res_end=seg[3]
+      ch_id=seg[1]
+      for res in range(res_start,res_end+1):
+        res_color_spec=[([ch_id,res,""],segment_colour)]
+        colour_list=colour_list+res_color_spec
+    else:
+      res_start=seg[2]
+      res_end=seg[3]
+      ch_id_here=seg[1]
+      for res in range(res_start,res_end+1):
+        blank_color_spec=[([ch_id_here,res,""],blank_colour)]
+        blank_list=blank_list+blank_color_spec
+  clear_user_defined_atom_colours(mol_id)
+  set_user_defined_atom_colour_by_residue_py(mol_id,colour_list)
+  set_user_defined_atom_colour_by_residue_py(mol_id,blank_list)
+  graphics_to_user_defined_atom_colours_representation(mol_id)
+
+
 def color_emringer_outliers(mol_id,map_id):
   if find_exe("phenix.emringer"):
     import subprocess
@@ -1403,6 +1435,20 @@ def cut_active_segment():
       ch_id=seg[1]
       new_molecule_by_atom_selection(mol_id, "//{ch_id}/{res_start}-{res_end}/".format(ch_id=ch_id,res_start=res_start,res_end=res_end))
       delete_residue_range(mol_id,ch_id,res_start,res_end)
+
+#Delete active segment
+def delete_active_segment():
+  mol_id=active_residue()[0]
+  segments=segment_list(mol_id)
+  res_here=active_residue()[2]
+  ch_id=active_residue()[1]
+  for seg in segments:
+    if (res_here>=seg[2]) and (res_here<=seg[3]) and (ch_id==seg[1]):
+      res_start=seg[2]
+      res_end=seg[3]
+      ch_id=seg[1]
+      delete_residue_range(mol_id,ch_id,res_start,res_end)
+
 
 #Jiggle-fits active chain to map
 def jiggle_fit_active_chain():
@@ -3841,6 +3887,9 @@ add_simple_coot_menu_menuitem(submenu_display,
 "Color active chain", lambda func: color_active_chain())
 
 add_simple_coot_menu_menuitem(submenu_display,
+"Color active segment", lambda func: colour_active_segment())
+
+add_simple_coot_menu_menuitem(submenu_display,
 "Color by protein/nucleic acid", lambda func: color_protein_na(active_residue()[0]))
 
 
@@ -4025,6 +4074,9 @@ add_simple_coot_menu_menuitem(submenu_copy,
 #"Delete..."
 add_simple_coot_menu_menuitem(submenu_delete,
 "Delete active chain", lambda func: delete_chain())
+
+add_simple_coot_menu_menuitem(submenu_delete, "Delete active segment", lambda func: delete_active_segment())
+
 
 add_simple_coot_menu_menuitem(submenu_delete, 
 "Delete hydrogens from molecule", lambda func: delete_h_active())
