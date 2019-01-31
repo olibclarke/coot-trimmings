@@ -5,6 +5,8 @@ Copy python file (`oli_custom.py`) to the `~/.coot-preferences/` directory (hidd
 
 You should see a new menu ("Custom") and a bunch of new key bindings, as well as a couple of new toolbar buttons (e.g. "sequence context").
 
+(**There are some non-default settings which I like but you may not! Check the bottom of this readme for details and tweak as you prefer**)
+
 Email me if you run into any trouble (olibclarke at gmail dot com).
 
 I haven't tested most of these on WinCoot, or on older versions of Coot. Most testing done with Coot 0.8.8 or later.
