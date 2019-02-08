@@ -1667,6 +1667,55 @@ def refine_residues_sphere_click():
     else:
       info_dialog("Sorry, start and end residues must be in same mol and chain! And you need to have a refinement map.")
   user_defined_click(2,refine_residues_sphere_click_a)
+
+#Python version of sphere refine from here:
+#https://www.mail-archive.com/coot@jiscmail.ac.uk/msg01463.html
+def sphere_refine_active(radius):
+    from types import ListType
+    active_atom = active_residue()
+    if (not active_atom):
+        add_status_bar_text("No active residue")
+    else:
+        imol      = active_atom[0]
+        chain_id  = active_atom[1]
+        res_no    = active_atom[2]
+        ins_code  = active_atom[3]
+        atom_name = active_atom[4]
+        alt_conf  = active_atom[5]
+        centred_residue = active_atom[1:4]
+        other_residues = residues_near_residue(imol, centred_residue, radius)
+        all_residues = [centred_residue]
+        if (type(other_residues) is ListType):
+            all_residues += other_residues
+        print "imol: %s residues: %s" %(imol, all_residues)
+        refine_residues(imol, all_residues)
+
+def stepped_sphere_refine(mol_id,ch_id):
+  turn_off_backup(mol_id)
+  set_refinement_immediate_replacement(1)
+  if is_polymer(mol_id,ch_id): 
+    first_res=first_residue(mol_id,ch_id)
+    last_res=last_residue(mol_id,ch_id)
+    if is_protein_chain_p(mol_id,ch_id):
+      for res in range(first_res,last_res+1):
+        try:
+          set_go_to_atom_chain_residue_atom_name(ch_id,res," CA ")
+          sphere_refine_active(7)
+          accept_regularizement()
+        except:
+          print("Residue doesn't exist! Moving on...")
+    elif is_nucleotide_chain_p(mol_id,ch_id):
+      for res in range(first_res,last_res+1):
+        try:
+          set_go_to_atom_chain_residue_atom_name(ch_id,res," P ")
+          sphere_refine_active(7)
+          accept_regularizement()
+        except:
+          print("Residue doesn't exist! Moving on...")
+  set_refinement_immediate_replacement(0)
+  turn_on_backup(mol_id)
+  info_dialog("Refinement finished - all done!")
+
   
 #Stepped v of cylinder refine:
 #get mol from active residue
@@ -3931,6 +3980,9 @@ add_simple_coot_menu_menuitem(submenu_display, "Make stereo-wiggle GIF of curren
 #"Fit..."
 add_simple_coot_menu_menuitem(submenu_fit, "Fit all chains to map", 
 lambda func: rigid_fit_all_chains())
+
+add_simple_coot_menu_menuitem(submenu_fit, "Stepped sphere refine active chain",
+lambda func: stepped_sphere_refine(active_residue()[0],active_residue()[1]))
 
 add_simple_coot_menu_menuitem(submenu_fit, "Fit current chain to map", 
 lambda func: rigid_fit_active_chain())
