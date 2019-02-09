@@ -1693,25 +1693,26 @@ def sphere_refine_active(radius):
 def stepped_sphere_refine(mol_id,ch_id):
   turn_off_backup(mol_id)
   set_refinement_immediate_replacement(1)
+  valid_resnames=['A','C','T','G','U','ALA','UNK','ARG','ASN','ASP','CYS','GLU','GLN','GLY','HIS','ILE','LEU','LYS','MET','MSE','PHE','PRO','SER','THR','TRP','TYR','VAL']
   if is_polymer(mol_id,ch_id): 
     first_res=first_residue(mol_id,ch_id)
     last_res=last_residue(mol_id,ch_id)
     if is_protein_chain_p(mol_id,ch_id):
       for res in range(first_res,last_res+1):
-        try:
+        res_exist_flag=does_residue_exist_p(mol_id,ch_id,res,"")
+        resname=residue_name(mol_id,ch_id,res,"")
+        if (res_exist_flag==1) and (resname in valid_resnames):
           set_go_to_atom_chain_residue_atom_name(ch_id,res," CA ")
           sphere_refine_active(7)
           accept_regularizement()
-        except:
-          print("Residue doesn't exist! Moving on...")
     elif is_nucleotide_chain_p(mol_id,ch_id):
       for res in range(first_res,last_res+1):
-        try:
+        res_exist_flag=does_residue_exist_p(mol_id,ch_id,res,"")
+        resname=residue_name(mol_id,ch_id,res,"")
+        if (res_exist_flag==1) and (resname in valid_resnames):
           set_go_to_atom_chain_residue_atom_name(ch_id,res," P ")
           sphere_refine_active(7)
           accept_regularizement()
-        except:
-          print("Residue doesn't exist! Moving on...")
   set_refinement_immediate_replacement(0)
   turn_on_backup(mol_id)
   info_dialog("Refinement finished - all done!")
