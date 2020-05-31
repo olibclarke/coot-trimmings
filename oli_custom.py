@@ -7,6 +7,9 @@
 #Make symmetry copies a brighter color
 set_symmetry_colour(255,35,0)
 
+#turn off scrolling to change contour (for trackpads)
+set_scroll_by_wheel_mouse(0)
+
 #Consider clashes when autofitting rotamers.
 set_auto_fit_best_rotamer_clash_flag(1)
 
@@ -20,7 +23,7 @@ set_rotamer_search_mode(ROTAMERSEARCHLOWRES)
 set_refine_ramachandran_angles(1)
 
 #Use finer map sampling
-set_map_sampling_rate(2.0)
+set_map_sampling_rate(3.0)
 
 #Allow duplicate sequence numbers (otherwise some PDBs won't load)
 try:
@@ -72,9 +75,6 @@ set_terminal_residue_do_rigid_body_refine(0)
 
 #real space refine after mutating residue
 set_mutate_auto_fit_do_post_refine(1)
-
-#Don't change contour level with scroll wheel (use +/- and shift+1-9 instead)
-set_scroll_by_wheel_mouse(0)
 
 #Set symmetry radius to 30 A
 set_symmetry_size(30)
@@ -1571,6 +1571,65 @@ def rebuild_backbone_wrapper():
       info_dialog("Sorry, residues must be in same mol and chain!")
   user_defined_click(2,rebuild_backbone)
 
+def rebuild_backbone_reverse_wrapper():
+  def rebuild_backbone_reverse(res1):
+    mol_id=res1[1]
+    ch_id=res1[2]
+    resid1=res1[3]
+    segments=segment_list(mol_id)
+    for seg in segments:
+      if (resid1>=seg[2]) and (resid1<=seg[3]) and (ch_id==seg[1]):
+        res_start=seg[2]
+        res_end=seg[3]
+        ch_id=seg[1]
+        turn_off_backup(mol_id)
+        if res_start!=res_end:
+          reverse_direction_of_fragment(mol_id,ch_id,res_start)
+          new_mol_id=db_mainchain(mol_id,ch_id,res_start,res_end,"forwards")
+        accept_regularizement()
+        res1_rsr=first_residue(new_mol_id,ch_id)
+        res2_rsr=last_residue(new_mol_id,ch_id)
+        #need to mutate each residue to appropriate sidechain and kill sidechain
+        #get target seq with aa_code=three_letter_code2single_letter(residue_name(mol_id,ch_id,resnum,ins_code))
+        #mutate_residue_range
+        #delete_sidechain_range
+        target_seq=""
+        for res in range(res1_rsr,res2_rsr+1):
+          aa_code=three_letter_code2single_letter(residue_name(new_mol_id,ch_id,res,""))
+          target_seq=target_seq+aa_code
+        print("target seq:",target_seq)
+        mutate_residue_range(new_mol_id,ch_id,res1_rsr,res2_rsr,target_seq)
+        delete_sidechain_range(new_mol_id,ch_id,res1_rsr,res2_rsr)
+        for res in range(res1_rsr,res2_rsr+1):
+          if residue_name(new_mol_id,ch_id,res,"")=="PRO":
+            target_seq="P"
+            mutate_residue_range(new_mol_id,ch_id,res,res,target_seq)
+        #cut out orginal region and merge in new fragment?
+        delete_residue_range(mol_id,ch_id,res_start,res_end)
+        merge_molecules([new_mol_id],mol_id)
+        turn_off_backup(mol_id)
+  user_defined_click(1,rebuild_backbone_reverse)
+
+def fit_this_segment():
+  if (imol_refinement_map()==-1):
+    info_dialog("You must set a refinement map!")
+  else:
+    mol_id=active_residue()[0]
+    segments=segment_list(mol_id)
+    res_here=active_residue()[2]
+    ch_id=active_residue()[1]
+    for seg in segments:
+      if (res_here>=seg[2]) and (res_here<=seg[3]) and (ch_id==seg[1]):
+        res_start=seg[2]
+        res_end=seg[3]
+        ch_id=seg[1]
+        turn_off_backup(mol_id)
+        set_refinement_immediate_replacement(1)
+        rigid_body_refine_zone(res_start,res_end,ch_id,mol_id)
+        accept_regularizement()
+        set_refinement_immediate_replacement(0)
+        turn_on_backup(mol_id)
+
 
 #Real space refine for keyboard shortcut
 def refine_click():
@@ -2679,7 +2738,14 @@ def pick_common_monomers():
   get_mes=["MES", lambda func: get_monomer_no_H("MES")]
   get_cac=["Cacodylate", lambda func: get_monomer_no_H("CAD")]
   get_peg=["PEG", lambda func: get_monomer_no_H("1PE")]
-  button_list=[get_acetate,get_eg,get_glycerol,get_dmso,get_ddm,get_dm,get_bog,get_ldao,get_mpg,get_tris,get_hepes,get_mes,get_cac,get_peg]
+  get_popg=["POPG (lipid)", lambda func: get_monomer_no_H("LHG")]
+  get_pe=["PE (lipid)", lambda func: get_monomer_no_H("PEF")]
+  get_pc=["PC (lipid)", lambda func: get_monomer_no_H("PLC")]
+  get_ps=["PS (lipid)", lambda func: get_monomer_no_H("PSF")]
+  get_ps=["PI(3,4)P2 (lipid)", lambda func: get_monomer_no_H("52N")]
+  get_chs=["Cholesterol hemisuccinate", lambda func: get_monomer_no_H("Y01")]
+  get_chl=["Cholesterol", lambda func: get_monomer_no_H("CLR")]
+  button_list=[get_acetate,get_eg,get_glycerol,get_dmso,get_ddm,get_dm,get_bog,get_ldao,get_mpg,get_tris,get_hepes,get_mes,get_cac,get_peg,get_popg,get_pe,get_pc,get_ps,get_chs,get_chl]
   generic_button_dialog("Common small molecules",button_list)
   
 #Switch all models to CA representation
@@ -4082,7 +4148,9 @@ add_simple_coot_menu_menuitem(submenu_build, "Make alpha helix of length n", lam
 
 add_simple_coot_menu_menuitem(submenu_build, "Make 3-10 helix of length n", lambda func: place_new_3_10_helix())
 
-add_simple_coot_menu_menuitem(submenu_build, "Rebuld backbone (click start,end)", lambda func: rebuild_backbone_wrapper())
+add_simple_coot_menu_menuitem(submenu_build, "Rebuild backbone (click start,end)", lambda func: rebuild_backbone_wrapper())
+
+add_simple_coot_menu_menuitem(submenu_build, "Rebuild and reverse backbone of segment (click segment)", lambda func: rebuild_backbone_reverse_wrapper())
 
 
 
