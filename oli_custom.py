@@ -3879,6 +3879,39 @@ def find_sequence_with_entry():
   "MAAAA","Find sequence in active chain",find_sequence_in_current_chain)
 
       
+def user_defined_add_arbitrary_length_bond_restraint(bond_length=2.0):
+  def make_restr(text_list, continue_qm):
+    s = "Now click on 2 atoms to define the additional bond restraint"
+    add_status_bar_text(s)
+    dist = text_list[0]
+    try:
+      bl = float(dist)
+    except:
+      bl = False
+      add_status_bar_text("Must define a number for the bond length")
+    if bl:
+      def make_restr_dist(*args):
+        atom_spec_1 = args[0]
+        atom_spec_2 = args[1]
+        imol = atom_spec_1[1]
+        print "BL DEBUG:: imol: %s spec 1: %s and 2: %s" %(imol, atom_spec_1, atom_spec_2)
+        add_extra_bond_restraint(imol, atom_spec_1[2], atom_spec_1[3], atom_spec_1[4], atom_spec_1[5], atom_spec_1[6], atom_spec_2[2], atom_spec_2[3], atom_spec_2[4], atom_spec_2[5], atom_spec_2[6], bl, 0.035)
+      user_defined_click(2, make_restr_dist)
+      if continue_qm:
+        user_defined_add_arbitrary_length_bond_restraint(bl)
+  def stay_open(*args):
+    pass
+  #generic_single_entry("Add a User-defined extra distance restraint",
+  #                     "2.0",
+  #                     "OK...",
+  #                     lambda text: make_restr(text))
+  generic_multiple_entries_with_check_button(
+    [["Add a User-defined extra distance restraint",
+      str(bond_length)]],
+    ["Stay open?", lambda active_state: stay_open(active_state)],
+    "OK...",
+    lambda text, stay_open_qm: make_restr(text, stay_open_qm))
+      
 
       
       
@@ -4079,6 +4112,7 @@ add_simple_coot_menu_menuitem(submenu_fit,
 add_simple_coot_menu_menuitem(submenu_fit,
 "Cylinder refine (click start and end of range)",lambda func: refine_residues_sphere_click())
 
+add_simple_coot_menu_menuitem(submenu_fit, "Add distance restraint (click two atoms)",lambda func:  user_defined_add_arbitrary_length_bond_restraint(bond_length=2.0))
 
 #"Renumber..."
 
