@@ -5,6 +5,8 @@ Copy python file (`coot_trimmings.py`) to the `~/.coot-preferences/` directory (
 
 You should see a new menu ("Custom") and a bunch of new key bindings, as well as a couple of new toolbar buttons (e.g. "sequence context").
 
+(If you see an errror like `<!DOCTYPE html> ^ SyntaxError: invalid syntax`, you have downloaded the webpage rather than the actual Python script. Make sure you clicked "download raw file" when downloading.)
+
 (*NOTE: There are some non-default settings (e.g. I don't like using the scroll-wheel for changing map contours) which I like but you may not! Check the bottom of this readme for details and tweak as you prefer.*)
 
 Email me if you run into any trouble (olibclarke at gmail dot com).
