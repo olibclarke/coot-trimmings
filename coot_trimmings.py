@@ -352,12 +352,17 @@ def hide_active_mol():
   set_mol_displayed(mol_id,0)
 
 def display_only_active():
-  mol_id_active=active_residue()[0]
+  try:
+    mol_id_active=active_residue()[0]
+  except:
+    mol_id_active=model_molecule_list()[0]
   displayed_mols_count=0
   for mol_id in model_molecule_list():
     displayed_mols_count=displayed_mols_count+mol_is_displayed(mol_id)
     if (mol_is_displayed(mol_id)==1) and (mol_id!=mol_id_active):
       set_mol_displayed(mol_id,0)
+    elif (mol_is_displayed(mol_id)==0) and (mol_id==mol_id_active):
+      set_mol_displayed(mol_id,1)
     if mol_is_displayed(mol_id):
       displayed_mol=mol_id
   if displayed_mols_count==1:
