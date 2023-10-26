@@ -106,7 +106,7 @@ lambda: place_helix_with_restraints())
 add_key_binding("Toggle toolbar display","H",
 lambda: toggle_toolbar_display())
 
-#Toggle display of modelling toolbar (assumes initial state is shown)
+#Toggle global display of map
 add_key_binding("Toggle global view of map","G",
 lambda: toggle_global_map_view())
 
@@ -526,17 +526,22 @@ def toggle_map_display():
       disp_value=map_is_displayed(map_id)
       map_disp_flag[map_id]=disp_value
       if disp_value==1:
-        set_map_displayed(map_id,0)
+        set_map_displayed(map_id,0) #If any maps are displayed, undisplay them.
     map_disp_flag_cycle=1
   elif map_disp_flag_cycle==1:
+    disp_counter=0 
     for map_id in map_molecule_list():
-      if map_id not in map_disp_flag:
+      if map_id not in map_disp_flag: #if the map wasn't present in the previous cycle, assign a disp_value for it
         disp_value=map_is_displayed(map_id)
         map_disp_flag[map_id]=disp_value
       if map_disp_flag[map_id]==1:
-        set_map_displayed(map_id,1)
+        set_map_displayed(map_id,1) #Redisplay any maps that were displayed on the previous cycle.
+      disp_counter=disp_counter+map_disp_flag[map_id] #test
+    if disp_counter==0: #If no maps were displayed in the prior cycle, display all maps.
+      for map_id in map_molecule_list(): 
+        set_map_displayed(map_id,1) 
     map_disp_flag_cycle=0
-    
+
 #Toggle display of modelling toolbar (assumes it is shown by default)
 toolbar_toggle_var=0
 def toggle_toolbar_display():
@@ -895,14 +900,19 @@ def toggle_mol_display():
         set_mol_displayed(mol_id,0)
     mol_disp_flag_cycle=1
   elif mol_disp_flag_cycle==1:
+    disp_counter=0
     for mol_id in model_molecule_list():
       if mol_id not in mol_disp_flag:
         disp_value=mol_is_displayed(mol_id)
         mol_disp_flag[mol_id]=disp_value
       if mol_disp_flag[mol_id]==1:
         set_mol_displayed(mol_id,1)
+      disp_counter=disp_counter+mol_disp_flag[mol_id]
+    if disp_counter==0:
+      for mol_id in model_molecule_list():
+        set_mol_displayed(mol_id,1)
     mol_disp_flag_cycle=0
-    
+
 #Cycle representation mode forward/back
 cycle_rep_flag={0:0}
 def cycle_rep_up(mol_id,flag):
