@@ -15,7 +15,7 @@ I haven't tested most of these on WinCoot, or on older versions of Coot. Most te
 
 Also, many of the functions here haven't been tested on molecules with insertion codes. If this is important to you, let me know and I'll fix.
 
-_Note: I turn off scrolling contour with mouse wheel by default (`set_scroll_by_wheel_mouse(0)`), aas it doesn't play well with Mac trackpads - if you prefer it, you can change it back to `set_scroll_by_wheel_mouse(1)` in the script._
+**_Note: I turn off scrolling contour with mouse wheel by default (`set_scroll_by_wheel_mouse(0)`), as it doesn't play well with Mac trackpads - if you prefer it, you can change it back to `set_scroll_by_wheel_mouse(1)` in the script._**
 
 ## Custom menu
 
