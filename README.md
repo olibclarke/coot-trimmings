@@ -17,6 +17,17 @@ Also, many of the functions here haven't been tested on molecules with insertion
 
 **_Note: I turn off scrolling contour with mouse wheel by default (`set_scroll_by_wheel_mouse(0)`), as it doesn't play well with Mac trackpads - if you prefer it, you can change it back to `set_scroll_by_wheel_mouse(1)` in the script._**
 
+## Example use case/Tutorial
+1. Load up an EM-map and model (e.g. `8HEZ` & `EMD-34705`)
+2. Adjust the contour - `Shift-1` - `Shift-9` set the level from `1` to `9` sigma respectively, and `=` and `-` nudge the contour level up and down.
+3. Zoom in - you might notice the mesh is a bit coarse, which can make fine details difficult to interpret. This is a `2.8 Å` structure, but was solved at `1.1 Å/pixel`. Let's try resampling and brightening things up a bit to make it easier to see. To do this use `Custom -> Maps... -> Resample active EM map to 0.5 A/pixel`. (_Note: there are some smarts here - if the map is an X-ray map, it will not be resampled, but color changes etc will still happen; if it is an EM map but is already finer than `0.5 Å/pix`, the sampling will not be changed; if it is coarser than `0.5 Å/pix`, it will be resampled to `0.5 Å/pix` and the original map will be closed._)
+4. Use `;` and `'` to adjust the radius of the map in local mode.
+5. Sometimes, you want to quickly toggle the model off to better see the map, or vice-versa. To toggle the model on/off, press `/`; to switch between multiple models, press `Shift-/`. To toggle the map, press `` ` ``; to switch between multiple maps, press `Shift-``.
+6. Try cycling the representation of the model - press the `[` and `]` keys to move back and forward between the different modes (e.g. `CA-only` and all atom).
+7. Try cylinder refine - center on an atom, and press `a`. It will refine `+/- 5` residues around the center, and all segments within `4 Å` of the primary range.
+8. Try quick refine zone - press `A`, then click two atoms to define a range and refine.
+9. Try copy/pasting a ligand - center on a ligand or solvent molecule, and press `C`. A status message in the lower bar should indicate that the molecule has been copied. Move somewhere else, and press `V`. A copy should be pasted and merged into the active molecule. You can repeat this operation multiple times.
+
 ## Custom menu
 
 The script creates a `Custom` menu with these entries:
