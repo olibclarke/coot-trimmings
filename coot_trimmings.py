@@ -21,8 +21,8 @@ set_refine_max_residues(100)
 #Sets "Backrub" rotamers as default (best at low res)
 set_rotamer_search_mode(ROTAMERSEARCHLOWRES)
 
-#Don't use ramachandran restraints in real space refinement
-set_refine_ramachandran_angles(0)
+#Use ramachandran restraints in real space refinement
+set_refine_ramachandran_angles(1)
 
 #Use finer map sampling
 set_map_sampling_rate(3.0)
