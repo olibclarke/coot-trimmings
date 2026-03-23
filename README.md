@@ -188,6 +188,7 @@ Current built-in custom colouring options include:
 - Ramachandran outliers
 - density fit
 - NCS difference
+- Clash score
 
 Details:
 
@@ -203,6 +204,10 @@ Details:
   - blue = low NCS difference
   - red = high NCS difference
   - values above `2 A` saturate at the red end
+- Clash score coloring
+  - spectral colouring by per-residue maximum clash overlap
+  - blue = low clash
+  - red = high clash  
 
 ## EM map resampling / restyling
 
