@@ -27,6 +27,7 @@ Also, many of the functions here haven't been tested on molecules with insertion
 7. Try cylinder refine - center on an atom, and press `a`. It will refine `+/- 5` residues around the center, and all segments within `4 Å` of the primary range.
 8. Try quick refine zone - press `A`, then click two atoms to define a range and refine.
 9. Try copy/pasting a ligand - center on a ligand or solvent molecule, and press `C`. A status message in the lower bar should indicate that the molecule has been copied. Move somewhere else, and press `V`. A copy should be pasted and merged into the active molecule. You can repeat this operation multiple times.
+10. Try some of the custom coloring modes - try coloring by density fit, ramachandran outliers or clash score. If you cycle through the representation modes (`[` and `]`) you will see that there are custom coloring modes for both all atom and CA-only representation.
 
 ## Custom menu
 
