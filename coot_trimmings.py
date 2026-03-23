@@ -3,6 +3,8 @@
 #When Coot is restarted, a new "Custom" menu will appear, with some new shortcuts for various model-building tasks.
 #Also there will be a bunch of new keyboard shortcuts - check "Extensions...Settings...Key bindings" for details.
 
+import math
+
 #****Settings****
 #Make symmetry copies a brighter color
 set_symmetry_colour(255,35,0)
@@ -19,17 +21,14 @@ set_refine_max_residues(100)
 #Sets "Backrub" rotamers as default (best at low res)
 set_rotamer_search_mode(ROTAMERSEARCHLOWRES)
 
-#Use ramachandran restraints in real space refinement
-set_refine_ramachandran_angles(1)
+#Don't use ramachandran restraints in real space refinement
+set_refine_ramachandran_angles(0)
 
 #Use finer map sampling
 set_map_sampling_rate(3.0)
 
 #Allow duplicate sequence numbers (otherwise some PDBs won't load)
-try:
-  allow_duplicate_sequence_numbers()
-except NameError:
-  print("Your coot is a bit old... consider upgrading...")
+allow_duplicate_sequence_numbers()
 #Increase number of trials for add terminal residue
 set_add_terminal_residue_n_phi_psi_trials(1000)
 
@@ -98,9 +97,9 @@ icon_name="cell+symm.svg")
 
 
 
-#place helix with prosmart alpha helix restraints and depict in rainbow
+#Place helix here
 add_key_binding("Place helix here","h",
-lambda: place_helix_with_restraints())
+lambda: place_helix_here())
 
 #Toggle display of modelling toolbar (assumes initial state is shown)
 add_key_binding("Toggle toolbar display","H",
@@ -128,13 +127,13 @@ lambda: place_atom_at_pointer())
 add_key_binding("Flip peptide","q",
 lambda: pepflip_active_residue())
 
-#place helix with prosmart alpha helix restraints and depict in rainbow
+#Local cylinder refinement around the active residue or ligand
 add_key_binding("Auto refine zone","a",
-lambda: auto_refine(10))
+lambda: auto_refine())
 
-#Jiggle fit active res
+#Jiggle fit active non-polymer residue
 add_key_binding("Jiggle Fit","J",
-lambda: using_active_atom(fit_to_map_by_random_jiggle,"aa_imol","aa_chain_id","aa_res_no","aa_ins_code",1000,0.1))
+lambda: jiggle_fit_active_non_polymer_residue())
 
 #Clear pending picks
 add_key_binding("Clear Pending Picks","Tab",
@@ -181,9 +180,15 @@ lambda: cycle_residue_psi())
 add_key_binding("Refine Triple","r",
 lambda: key_binding_refine_triple())
 
+#Undo symmetry view only when symmetry is currently shown
+def undo_symmetry_view_if_shown():
+  if get_show_symmetry():
+    return undo_symmetry_view()
+  add_status_bar_text("Symmetry atoms are not currently shown")
+
 #Undo Symm view
-add_key_binding("Undo Symmetry View", "V",
-lambda: undo_symmetry_view())
+add_key_binding("Undo Symmetry View", "v",
+lambda: undo_symmetry_view_if_shown())
 
 #Cycle through rotamers for active reidue with 'R"
 add_key_binding("Cycle rotamers","R",
@@ -199,16 +204,16 @@ lambda: redo_visible())
 
 
 add_key_binding("Cycle representation mode forward","[",
-lambda: cycle_rep_up(active_residue()[0],cycle_rep_flag.get(active_residue()[0],0)))
+lambda: cycle_rep_up_active())
 
 add_key_binding("Cycle representation mode back","]",
-lambda: cycle_rep_down(active_residue()[0],cycle_rep_flag.get(active_residue()[0],0)))
+lambda: cycle_rep_down_active())
 
 add_key_binding("Cycle  symm representation mode forward","{",
-lambda: cycle_symm_up(active_residue()[0],cycle_symm_flag.get(active_residue()[0],0)))
+lambda: cycle_symm_up_active())
 
 add_key_binding("Cycle  symm representation mode back","}",
-lambda: cycle_symm_down(active_residue()[0],cycle_symm_flag.get(active_residue()[0],0)))
+lambda: cycle_symm_down_active())
 
 add_key_binding("Toggle map display","`",
 lambda: toggle_map_display())
@@ -298,20 +303,842 @@ lambda: display_only_active())
 add_key_binding("Display only the active map","~",
 lambda: display_only_active_map())
 
-#Go to equivalent residue on ncs master chain
+#Go to equivalent residue on next NCS chain / master chain
+
+def goto_next_ncs_chain():
+  try:
+    return skip_to_next_ncs_chain("forward")
+  except:
+    _status_message("Unable to skip to next NCS chain")
+    return None
 
 def goto_ncs_master():
-  mol_id=active_residue()[0]
-  resno=active_residue()[2]
-  atom_name=active_residue()[4]
-  ncs_ch_id=ncs_master_chain_id(mol_id)
-  set_go_to_atom_molecule(mol_id)
-  set_go_to_atom_chain_residue_atom_name(ncs_ch_id,resno,atom_name)
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  mol_id=residue[0]
+  master_chain_id=_ncs_master_chain_id(mol_id)
+  if not master_chain_id:
+    _status_message("No NCS master chain found")
+    return None
+  start_chain_id=go_to_atom_chain_id()
+  if start_chain_id == master_chain_id:
+    return None
+  visited_chain_ids={}
+  while True:
+    current_chain_id=go_to_atom_chain_id()
+    if current_chain_id == master_chain_id:
+      return None
+    if visited_chain_ids.get(current_chain_id, 0):
+      _status_message("Unable to reach NCS master chain")
+      return None
+    visited_chain_ids[current_chain_id]=1
+    goto_next_ncs_chain()
+    if go_to_atom_chain_id() == current_chain_id:
+      _status_message("Unable to reach NCS master chain")
+      return None
+    if go_to_atom_chain_id() == start_chain_id:
+      _status_message("Unable to reach NCS master chain")
+      return None
+
+add_key_binding("Go to next NCS chain","o",
+lambda: goto_next_ncs_chain())
+
 add_key_binding("Go to NCS master chain","O",
 lambda: goto_ncs_master())
 
+add_key_binding("Go to nearest density peak","b",
+lambda: go_to_nearest_density_peak())
+
+add_key_binding("Smart copy active non-polymer residue","C",
+lambda: smart_copy_active_non_polymer_residue())
+
+add_key_binding("Smart paste copied non-polymer residue","V",
+lambda: smart_paste_copied_non_polymer_residue())
+
+add_key_binding("Generate smart local extra restraints","g",
+lambda: confirm_generate_smart_local_extra_restraints())
+
+add_key_binding("Decrease map radius",";",
+lambda: decrease_map_radius_with_status())
+
+add_key_binding("Increase map radius","'",
+lambda: increase_map_radius_with_status())
+
   
 #****Misc. functions (for keybindings and scripting****
+SMART_COPY_TEMPLATE_IMOL=None
+SMART_COPY_SOURCE_CENTRE=None
+SMART_COPY_RESIDUE_NAME=None
+MAP_GLOBAL_VIEW_SETTINGS={}
+EM_GLOBAL_MAP_COLOUR=(0.23137254901960785, 0.4549019607843137, 1.0)
+PROPORTIONAL_EDITING_RADIUS=1.0
+
+POLYMER_RESIDUE_NAMES=set([
+  "A","C","G","U","T","DA","DC","DG","DT",
+  "PSU","H2U","5MU","OMU","4SU",
+  "1MA","2MA","6MA","MIA",
+  "5MC","OMC",
+  "1MG","2MG","7MG","M2G","OMG","YG",
+  "ALA","UNK","ARG","ASN","ASP","CYS","GLU","GLN","GLY","HIS","ILE",
+  "LEU","LYS","MET","MSE","PHE","PRO","SER","THR","TRP","TYR","VAL",
+  "P1L","SEP","TPO","PTR","CSO","CME","MLY","MLZ","HYP","KCX","ALY",
+  "FME","PYL","SEC"
+])
+
+def _status_message(message):
+  try:
+    add_status_bar_text(message)
+  except:
+    print message
+
+def _active_residue_or_status():
+  residue=active_residue()
+  if residue:
+    return residue
+  _status_message("No active residue")
+  return None
+
+def _active_molecule_or_status():
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  return residue[0]
+
+_NCS_MASTER_CHAIN_ID_BUILTIN=globals().get("ncs_master_chain_id")
+
+def _ncs_master_chain_id(imol):
+  if callable(_NCS_MASTER_CHAIN_ID_BUILTIN):
+    try:
+      return _NCS_MASTER_CHAIN_ID_BUILTIN(imol)
+    except:
+      pass
+  for helper_name in ["ncs_master_chain_id_py", "ncs_chain_ids"]:
+    helper=globals().get(helper_name)
+    if not callable(helper):
+      continue
+    try:
+      result=helper(imol)
+    except:
+      continue
+    if isinstance(result, (list, tuple)) and result:
+      first=result[0]
+      if isinstance(first, (list, tuple)) and first:
+        return first[0]
+      return first
+    if result:
+      return result
+  return None
+
+def _ncs_master_residue_spec(imol, chain_id, resno, ins_code):
+  master_chain_id=_ncs_master_chain_id(imol)
+  if not master_chain_id:
+    return None
+  if chain_id == master_chain_id:
+    return [master_chain_id, resno, ins_code]
+  try:
+    diffs=ncs_chain_differences(imol, master_chain_id)
+  except:
+    diffs=False
+  if not diffs:
+    return None
+  for i in range(0, len(diffs), 3):
+    try:
+      peer_chain_id=diffs[i]
+      target_chain_id=diffs[i+1]
+      residue_diffs=diffs[i+2]
+    except:
+      continue
+    if peer_chain_id != chain_id or target_chain_id != master_chain_id:
+      continue
+    if not isinstance(residue_diffs, list):
+      continue
+    for residue_diff in residue_diffs:
+      if not isinstance(residue_diff, list) or len(residue_diff) < 2:
+        continue
+      peer_residue=residue_diff[0]
+      target_residue=residue_diff[1]
+      if (isinstance(peer_residue, list) and len(peer_residue) >= 2 and
+          peer_residue[0] == resno and peer_residue[1] == ins_code and
+          isinstance(target_residue, list) and len(target_residue) >= 2):
+        return [master_chain_id, target_residue[0], target_residue[1]]
+  return [master_chain_id, resno, ins_code]
+
+def _set_go_to_residue_atom(chain_id, resno, ins_code, atom_name, alt_conf):
+  full_helper=globals().get("set_go_to_atom_chain_residue_atom_name_full")
+  if callable(full_helper):
+    try:
+      return full_helper(chain_id, resno, ins_code, atom_name, alt_conf)
+    except:
+      pass
+  return set_go_to_atom_chain_residue_atom_name(chain_id, resno, atom_name)
+
+def _pick_existing_target_atom(imol, chain_id, resno, ins_code, preferred_atom_name, preferred_alt_conf):
+  residue_atoms=residue_info_py(imol, chain_id, resno, ins_code) or []
+  parsed_atoms=[]
+  for atom in residue_atoms:
+    parsed_atom=_parsed_atom_record(atom)
+    if parsed_atom:
+      parsed_atoms.append(parsed_atom)
+  if not parsed_atoms:
+    return (preferred_atom_name, preferred_alt_conf)
+
+  stripped_preferred=preferred_atom_name.strip()
+  for atom in parsed_atoms:
+    if atom["name"].strip() == stripped_preferred and atom["alt_conf"] == preferred_alt_conf:
+      return (atom["name"], atom["alt_conf"])
+  for atom in parsed_atoms:
+    if atom["name"].strip() == stripped_preferred:
+      return (atom["name"], atom["alt_conf"])
+  for fallback_name in ["CA", "P"]:
+    for atom in parsed_atoms:
+      if atom["name"].strip() == fallback_name:
+        return (atom["name"], atom["alt_conf"])
+  return (parsed_atoms[0]["name"], parsed_atoms[0]["alt_conf"])
+
+def _scrollable_map_or_status():
+  map_id=scroll_wheel_map()
+  if map_id!=-1 and map_id in map_molecule_list():
+    return map_id
+  _status_message("No active map")
+  return None
+
+def _residue_is_polymer(mol_id, chain_id, resno, ins_code):
+  if does_residue_exist_p(mol_id, chain_id, resno, ins_code)==0:
+    return False
+  return residue_name(mol_id, chain_id, resno, ins_code) in POLYMER_RESIDUE_NAMES
+
+def _rotation_centre_xyz():
+  return [rotation_centre_position(0), rotation_centre_position(1), rotation_centre_position(2)]
+
+def _distance_sq(point_1, point_2):
+  dx=point_1[0]-point_2[0]
+  dy=point_1[1]-point_2[1]
+  dz=point_1[2]-point_2[2]
+  return dx*dx + dy*dy + dz*dz
+
+def decrease_map_radius_with_status():
+  current_radius=get_map_radius()
+  new_radius=current_radius-2.0
+  if new_radius < 2.0:
+    new_radius=2.0
+  set_map_radius(new_radius)
+  try:
+    set_map_radius_em(new_radius)
+  except:
+    pass
+  _status_message("Map radius %.1f A" % new_radius)
+
+def increase_map_radius_with_status():
+  current_radius=get_map_radius()
+  new_radius=current_radius+2.0
+  if new_radius > 1000.0:
+    new_radius=1000.0
+  set_map_radius(new_radius)
+  try:
+    set_map_radius_em(new_radius)
+  except:
+    pass
+  _status_message("Map radius %.1f A" % new_radius)
+
+def stepped_sphere_refine_active_chain():
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  return stepped_sphere_refine(residue[0], residue[1])
+
+def color_rotamer_outliers_and_missing_atoms_for_active_molecule():
+  mol_id=_active_molecule_or_status()
+  if mol_id is None:
+    return None
+  return color_rotamer_outliers_and_missing_atoms(mol_id)
+
+def color_polars_and_hphobs_for_active_molecule():
+  mol_id=_active_molecule_or_status()
+  if mol_id is None:
+    return None
+  return color_polars_and_hphobs(mol_id)
+
+def color_by_charge_for_active_molecule():
+  mol_id=_active_molecule_or_status()
+  if mol_id is None:
+    return None
+  return color_by_charge(mol_id)
+
+def color_protein_na_for_active_molecule():
+  mol_id=_active_molecule_or_status()
+  if mol_id is None:
+    return None
+  return color_protein_na(mol_id)
+
+def color_waters_for_active_molecule():
+  mol_id=_active_molecule_or_status()
+  if mol_id is None:
+    return None
+  return color_waters(mol_id)
+
+def _read_ccp4_mrc_grid_spacing(file_name):
+  import os
+  import struct
+  if not file_name or not os.path.isfile(file_name):
+    return None
+  header_file=open(file_name, "rb")
+  try:
+    header=header_file.read(224)
+  finally:
+    header_file.close()
+  if len(header) < 52:
+    return None
+  parsed=None
+  for endian in ["<", ">"]:
+    try:
+      ints=struct.unpack(endian+"10i", header[:40])
+      floats=struct.unpack(endian+"3f", header[40:52])
+    except struct.error:
+      continue
+    mx=ints[7]
+    my=ints[8]
+    mz=ints[9]
+    xlen=floats[0]
+    ylen=floats[1]
+    zlen=floats[2]
+    if mx > 0 and my > 0 and mz > 0 and xlen > 0.0 and ylen > 0.0 and zlen > 0.0:
+      parsed=(xlen/float(mx), ylen/float(my), zlen/float(mz))
+      break
+  if not parsed:
+    return None
+  return min(parsed)
+
+def _restyle_em_map_mesh(map_id, contour_sigma):
+  if map_is_difference_map(map_id)!=0:
+    return None
+  set_draw_solid_density_surface(map_id,0)
+  set_draw_map_standard_lines(map_id,1)
+  set_map_colour(map_id,EM_GLOBAL_MAP_COLOUR[0],EM_GLOBAL_MAP_COLOUR[1],EM_GLOBAL_MAP_COLOUR[2])
+  set_contour_level_in_sigma(map_id, contour_sigma)
+
+def resample_active_map_for_em_half_angstrom():
+  map_id=_scrollable_map_or_status()
+  if map_id is None:
+    return None
+  if map_is_difference_map(map_id)!=0:
+    _status_message("Difference maps are left unchanged")
+    return None
+  contour_sigma=get_contour_level_in_sigma(map_id)
+  map_file_name=molecule_name(map_id)
+  grid_spacing=_read_ccp4_mrc_grid_spacing(map_file_name)
+  if grid_spacing is None:
+    _restyle_em_map_mesh(map_id, contour_sigma)
+    _status_message("Grid spacing could not be determined; restyled active map")
+    return None
+  if grid_spacing <= 0.5:
+    _restyle_em_map_mesh(map_id, contour_sigma)
+    _status_message("Map already finer than 0.5 A/pixel; restyled active map")
+    return map_id
+  resample_factor=grid_spacing/0.5
+  old_refinement_map=(imol_refinement_map()==map_id)
+  try:
+    new_map_id=sharpen_blur_map_with_resampling(map_id, 0.0, resample_factor)
+  except:
+    new_map_id=-1
+  if new_map_id not in molecule_number_list():
+    _restyle_em_map_mesh(map_id, contour_sigma)
+    _status_message("Resampling failed; restyled active map")
+    return None
+  _restyle_em_map_mesh(new_map_id, contour_sigma)
+  set_scroll_wheel_map(new_map_id)
+  set_scrollable_map(new_map_id)
+  if old_refinement_map:
+    set_imol_refinement_map(new_map_id)
+  close_molecule(map_id)
+  _status_message("Created EM-style 0.5 A/pixel map")
+  return new_map_id
+
+def _capture_view_state():
+  return {
+    "rotation_centre": _rotation_centre_xyz(),
+    "zoom": zoom_factor(),
+    "quaternion": [get_view_quaternion_internal(0), get_view_quaternion_internal(1),
+                   get_view_quaternion_internal(2), get_view_quaternion_internal(3)]
+  }
+
+def _restore_view_state(view_state):
+  set_rotation_centre(*view_state["rotation_centre"])
+  set_view_quaternion(*view_state["quaternion"])
+  set_zoom(view_state["zoom"])
+
+def _close_smart_copy_template():
+  global SMART_COPY_TEMPLATE_IMOL
+  if SMART_COPY_TEMPLATE_IMOL in molecule_number_list():
+    close_molecule(SMART_COPY_TEMPLATE_IMOL)
+  SMART_COPY_TEMPLATE_IMOL=None
+
+def _set_smart_copy_template(imol):
+  global SMART_COPY_TEMPLATE_IMOL
+  SMART_COPY_TEMPLATE_IMOL=imol
+  try:
+    set_mol_displayed(imol,0)
+    set_mol_active(imol,0)
+  except:
+    pass
+
+def _smart_copy_atom_selection(chain_id, resno, ins_code):
+  if ins_code:
+    return None
+  return "//%s/%s" %(chain_id,resno)
+
+def _sorted_residue_specs(residue_specs):
+  return sorted([list(spec) for spec in residue_specs],
+                key=lambda spec: (spec[0], spec[1], spec[2]))
+
+def _fill_short_polymer_gaps(molecule_id, polymer_specs, max_gap_to_fill):
+  expanded_specs=set(polymer_specs)
+  polymer_by_chain={}
+  for chain_id, residue_no, ins_code in polymer_specs:
+    if ins_code=="":
+      polymer_by_chain.setdefault(chain_id,set()).add(residue_no)
+  for chain_id, residue_numbers in polymer_by_chain.items():
+    for _mol_id, segment_chain_id, segment_start, segment_end in segment_list_chain(molecule_id, chain_id):
+      residues_in_segment=sorted([residue_no for residue_no in residue_numbers
+                                  if segment_start <= residue_no <= segment_end])
+      for index in range(len(residues_in_segment)-1):
+        left_residue=residues_in_segment[index]
+        right_residue=residues_in_segment[index+1]
+        gap_size=right_residue-left_residue-1
+        if gap_size <= 0 or gap_size > max_gap_to_fill:
+          continue
+        for fill_residue in range(left_residue+1, right_residue):
+          if residue_exists_qm(molecule_id, segment_chain_id, fill_residue, ""):
+            expanded_specs.add((segment_chain_id, fill_residue, ""))
+  return expanded_specs
+
+def _expand_polymer_contact_windows(molecule_id, polymer_specs, window_size):
+  expanded_specs=set()
+  polymer_by_chain={}
+  for chain_id, residue_no, ins_code in polymer_specs:
+    if ins_code=="":
+      polymer_by_chain.setdefault(chain_id,set()).add(residue_no)
+    else:
+      expanded_specs.add((chain_id, residue_no, ins_code))
+  for chain_id, residue_numbers in polymer_by_chain.items():
+    fpr=first_polymer_residue(molecule_id, chain_id)
+    lpr=last_polymer_residue(molecule_id, chain_id)
+    if fpr==-10000 or lpr==-10000:
+      continue
+    for residue_no in residue_numbers:
+      res_start=max(fpr, residue_no-window_size)
+      res_end=min(lpr, residue_no+window_size)
+      for resn in range(res_start, res_end+1):
+        if residue_exists_qm(molecule_id, chain_id, resn, ""):
+          expanded_specs.add((chain_id, resn, ""))
+  return expanded_specs
+
+def _prune_small_polymer_fragments(molecule_id, polymer_specs, minimum_fragment_size):
+  kept_specs=set()
+  polymer_by_chain={}
+  for chain_id, residue_no, ins_code in polymer_specs:
+    if ins_code=="":
+      polymer_by_chain.setdefault(chain_id,set()).add(residue_no)
+  for chain_id, residue_numbers in polymer_by_chain.items():
+    for _mol_id, segment_chain_id, segment_start, segment_end in segment_list_chain(molecule_id, chain_id):
+      residues_in_segment=sorted([residue_no for residue_no in residue_numbers
+                                  if segment_start <= residue_no <= segment_end])
+      if not residues_in_segment:
+        continue
+      cluster=[residues_in_segment[0]]
+      for residue_no in residues_in_segment[1:]:
+        if residue_no == cluster[-1] + 1:
+          cluster.append(residue_no)
+        else:
+          if len(cluster) >= minimum_fragment_size:
+            for cluster_residue in cluster:
+              kept_specs.add((segment_chain_id, cluster_residue, ""))
+          cluster=[residue_no]
+      if len(cluster) >= minimum_fragment_size:
+        for cluster_residue in cluster:
+          kept_specs.add((segment_chain_id, cluster_residue, ""))
+  return kept_specs
+
+def smart_copy_active_non_polymer_residue():
+  global SMART_COPY_SOURCE_CENTRE
+  global SMART_COPY_RESIDUE_NAME
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  mol_id=residue[0]
+  ch_id=residue[1]
+  resno=residue[2]
+  ins_code=residue[3]
+  if _residue_is_polymer(mol_id, ch_id, resno, ins_code):
+    _status_message("Active residue is polymer; nothing copied")
+    return None
+  atom_selection=_smart_copy_atom_selection(ch_id, resno, ins_code)
+  if atom_selection is None:
+    _status_message("Smart copy does not yet support insertion-code residues")
+    return None
+  view_state=_capture_view_state()
+  recentre_state=recentre_on_read_pdb()
+  copied_imol=-1
+  try:
+    set_recentre_on_read_pdb(0)
+    copied_imol=new_molecule_by_atom_selection(mol_id, atom_selection)
+  finally:
+    set_recentre_on_read_pdb(recentre_state)
+    _restore_view_state(view_state)
+  if copied_imol==-1:
+    _status_message("Unable to copy active residue")
+    return None
+  _close_smart_copy_template()
+  _set_smart_copy_template(copied_imol)
+  SMART_COPY_SOURCE_CENTRE=residue_centre_py(mol_id, ch_id, resno, ins_code)
+  SMART_COPY_RESIDUE_NAME=residue_name(mol_id, ch_id, resno, ins_code)
+  _status_message("Copied %s for smart paste" % SMART_COPY_RESIDUE_NAME)
+
+def smart_paste_copied_non_polymer_residue():
+  if SMART_COPY_TEMPLATE_IMOL not in molecule_number_list():
+    _status_message("No copied ligand, ion, or water available")
+    return None
+  residue=active_residue()
+  if residue:
+    target_mol_id=residue[0]
+  else:
+    target_mol_id=go_to_atom_molecule_number()
+    if target_mol_id not in model_molecule_list():
+      _status_message("No active model for smart paste")
+      return None
+  if SMART_COPY_SOURCE_CENTRE is None:
+    _status_message("Copied residue centre is unavailable")
+    return None
+  paste_imol=copy_molecule(SMART_COPY_TEMPLATE_IMOL)
+  if paste_imol==-1:
+    _status_message("Unable to prepare pasted residue")
+    return None
+  pointer_position=_rotation_centre_xyz()
+  dx=pointer_position[0]-SMART_COPY_SOURCE_CENTRE[0]
+  dy=pointer_position[1]-SMART_COPY_SOURCE_CENTRE[1]
+  dz=pointer_position[2]-SMART_COPY_SOURCE_CENTRE[2]
+  try:
+    translate_molecule_by(paste_imol, dx, dy, dz)
+    merge_molecules([paste_imol], target_mol_id)
+  finally:
+    if paste_imol in molecule_number_list():
+      close_molecule(paste_imol)
+  _status_message("Pasted %s at pointer" % (SMART_COPY_RESIDUE_NAME or "copied residue"))
+
+def go_to_nearest_density_peak():
+  map_id=_scrollable_map_or_status()
+  if map_id is None:
+    return None
+  centre=_rotation_centre_xyz()
+  sigma=get_contour_level_in_sigma(map_id)
+  peak_list=map_peaks_near_point_py(map_id, sigma, centre[0], centre[1], centre[2], 8.0)
+  if not peak_list:
+    _status_message("No nearby density peak above current contour")
+    return None
+  nearest_peak=None
+  nearest_peak_distance_sq=None
+  for peak in peak_list:
+    if not isinstance(peak, (list, tuple)) or len(peak) < 3:
+      continue
+    try:
+      peak_xyz=[float(peak[0]), float(peak[1]), float(peak[2])]
+    except:
+      continue
+    distance_sq=_distance_sq(peak_xyz, centre)
+    if nearest_peak is None or distance_sq < nearest_peak_distance_sq:
+      nearest_peak=peak_xyz
+      nearest_peak_distance_sq=distance_sq
+  if nearest_peak is None:
+    _status_message("No nearby density peak above current contour")
+    return None
+  set_rotation_centre(nearest_peak[0], nearest_peak[1], nearest_peak[2])
+  return nearest_peak
+
+def _parsed_atom_record(atom):
+  position=residue_atom_to_position(atom)
+  if not position:
+    return None
+  return {
+    "name": residue_atom_to_atom_name(atom),
+    "alt_conf": residue_atom2alt_conf(atom),
+    "position": position
+  }
+
+def _residue_record_for_restraints(mol_id, residue_spec):
+  chain_id, resno, ins_code=residue_spec
+  residue_atoms=residue_info_py(mol_id, chain_id, resno, ins_code) or []
+  parsed_atoms=[]
+  backbone_atoms=[]
+  for atom in residue_atoms:
+    parsed_atom=_parsed_atom_record(atom)
+    if not parsed_atom:
+      continue
+    parsed_atoms.append(parsed_atom)
+    atom_name=parsed_atom["name"].strip()
+    if atom_name in ["N", "O", "OXT"]:
+      backbone_atoms.append(parsed_atom)
+  if not parsed_atoms:
+    return None
+  xs=[atom["position"][0] for atom in parsed_atoms]
+  ys=[atom["position"][1] for atom in parsed_atoms]
+  zs=[atom["position"][2] for atom in parsed_atoms]
+  return {
+    "spec": residue_spec,
+    "atoms": parsed_atoms,
+    "backbone_atoms": backbone_atoms,
+    "bbox": (min(xs), max(xs), min(ys), max(ys), min(zs), max(zs)),
+    "polymer": _residue_is_polymer(mol_id, chain_id, resno, ins_code)
+  }
+
+def _generate_smart_local_extra_restraints_for_mol(mol_id, distance_cutoff=3.7):
+  if mol_id not in model_molecule_list():
+    _status_message("No active model")
+    return None
+  distance_cutoff_sq=distance_cutoff*distance_cutoff
+  max_sequence_separation=10
+  restraint_esd=0.05
+  sequence_index_by_residue={}
+  ordered_residue_specs_by_chain={}
+  next_sequence_index_by_chain={}
+  residue_serial_entries=all_residues_with_serial_numbers(mol_id) or []
+  for residue_entry in residue_serial_entries:
+    if not residue_entry or len(residue_entry) < 4:
+      continue
+    residue_spec=residue_entry[1:]
+    chain_id=residue_spec_to_chain_id(residue_spec)
+    resno=residue_spec_to_res_no(residue_spec)
+    ins_code=residue_spec_to_ins_code(residue_spec)
+    if chain_id is False or resno is False or ins_code is False:
+      continue
+    sequence_index_by_residue[(chain_id,resno,ins_code)]=next_sequence_index_by_chain.get(chain_id,0)
+    next_sequence_index_by_chain[chain_id]=next_sequence_index_by_chain.get(chain_id,0)+1
+    ordered_residue_specs_by_chain.setdefault(chain_id,[]).append((chain_id,resno,ins_code))
+  residue_records={}
+  for chain_id, residue_specs in ordered_residue_specs_by_chain.items():
+    for residue_spec in residue_specs:
+      residue_records[residue_spec]=_residue_record_for_restraints(mol_id, residue_spec)
+
+  def atom_distance_sq(atom_1, atom_2):
+    dx=atom_1["position"][0]-atom_2["position"][0]
+    dy=atom_1["position"][1]-atom_2["position"][1]
+    dz=atom_1["position"][2]-atom_2["position"][2]
+    return dx*dx + dy*dy + dz*dz
+
+  def residue_records_can_contact(record_1, record_2, cutoff):
+    bbox_1=record_1["bbox"]
+    bbox_2=record_2["bbox"]
+    if bbox_1[1] + cutoff < bbox_2[0] or bbox_2[1] + cutoff < bbox_1[0]:
+      return False
+    if bbox_1[3] + cutoff < bbox_2[2] or bbox_2[3] + cutoff < bbox_1[2]:
+      return False
+    if bbox_1[5] + cutoff < bbox_2[4] or bbox_2[5] + cutoff < bbox_1[4]:
+      return False
+    return True
+
+  def sequence_separation(residue_spec_1, residue_spec_2):
+    if residue_spec_1[0] != residue_spec_2[0]:
+      return None
+    index_1=sequence_index_by_residue.get(residue_spec_1)
+    index_2=sequence_index_by_residue.get(residue_spec_2)
+    if index_1 is None or index_2 is None:
+      return None
+    return abs(index_1-index_2)
+
+  def ordered_pair_key(spec_1, spec_2):
+    if spec_2 < spec_1:
+      return (spec_2, spec_1)
+    return (spec_1, spec_2)
+
+  def is_backbone_hbond_candidate(atom_name_1, atom_name_2):
+    atom_name_1=atom_name_1.strip()
+    atom_name_2=atom_name_2.strip()
+    return ((atom_name_1=="N" and atom_name_2 in ["O","OXT"])
+            or (atom_name_2=="N" and atom_name_1 in ["O","OXT"]))
+
+  added_restraints=[0]
+  seen_restraints=set()
+  processed_backbone_pairs=set()
+  delete_all_extra_restraints(mol_id)
+
+  def add_restraints_between_records(record_1, record_2, backbone_only):
+    if not record_1 or not record_2:
+      return
+    if backbone_only and not (record_1["polymer"] and record_2["polymer"]):
+      return
+    if not residue_records_can_contact(record_1, record_2, distance_cutoff):
+      return
+    residue_pair_key=ordered_pair_key(record_1["spec"], record_2["spec"])
+    if backbone_only:
+      atoms_1=record_1["backbone_atoms"]
+      atoms_2=record_2["backbone_atoms"]
+    else:
+      atoms_1=record_1["atoms"]
+      atoms_2=record_2["atoms"]
+    for atom_1 in atoms_1:
+      atom_name_1=atom_1["name"]
+      alt_conf_1=atom_1["alt_conf"]
+      for atom_2 in atoms_2:
+        atom_name_2=atom_2["name"]
+        alt_conf_2=atom_2["alt_conf"]
+        if backbone_only and not is_backbone_hbond_candidate(atom_name_1, atom_name_2):
+          continue
+        restraint_key=(residue_pair_key, (atom_name_1, alt_conf_1), (atom_name_2, alt_conf_2))
+        reverse_restraint_key=(residue_pair_key, (atom_name_2, alt_conf_2), (atom_name_1, alt_conf_1))
+        if restraint_key in seen_restraints or reverse_restraint_key in seen_restraints:
+          continue
+        distance_sq=atom_distance_sq(atom_1, atom_2)
+        if distance_sq >= distance_cutoff_sq:
+          continue
+        distance=math.sqrt(distance_sq)
+        add_extra_geman_mcclure_restraint(
+          mol_id,
+          record_1["spec"][0], record_1["spec"][1], record_1["spec"][2], atom_name_1, alt_conf_1,
+          record_2["spec"][0], record_2["spec"][1], record_2["spec"][2], atom_name_2, alt_conf_2,
+          distance, restraint_esd)
+        seen_restraints.add(restraint_key)
+        added_restraints[0]=added_restraints[0]+1
+
+  processed_local_pairs=set()
+  for residue_spec_1 in residue_records.keys():
+    record_1=residue_records.get(residue_spec_1)
+    if not record_1:
+      continue
+    nearby_residue_specs=residues_near_residue(mol_id, list(residue_spec_1), distance_cutoff) or []
+    for nearby_spec in nearby_residue_specs:
+      if not nearby_spec or len(nearby_spec) < 3:
+        continue
+      residue_spec_2=(nearby_spec[0], nearby_spec[1], nearby_spec[2])
+      if residue_spec_1 == residue_spec_2:
+        continue
+      pair_key=ordered_pair_key(residue_spec_1, residue_spec_2)
+      if pair_key in processed_local_pairs:
+        continue
+      processed_local_pairs.add(pair_key)
+      separation=sequence_separation(residue_spec_1, residue_spec_2)
+      if separation is None or separation > max_sequence_separation:
+        continue
+      add_restraints_between_records(record_1, residue_records.get(residue_spec_2), False)
+
+  for residue_spec_1 in residue_records.keys():
+    record_1=residue_records.get(residue_spec_1)
+    if not record_1 or not record_1["polymer"]:
+      continue
+    nearby_residue_specs=residues_near_residue(mol_id, list(residue_spec_1), distance_cutoff) or []
+    for nearby_spec in nearby_residue_specs:
+      if not nearby_spec or len(nearby_spec) < 3:
+        continue
+      residue_spec_2=(nearby_spec[0], nearby_spec[1], nearby_spec[2])
+      if residue_spec_1 == residue_spec_2:
+        continue
+      pair_key=ordered_pair_key(residue_spec_1, residue_spec_2)
+      if pair_key in processed_backbone_pairs:
+        continue
+      processed_backbone_pairs.add(pair_key)
+      separation=sequence_separation(residue_spec_1, residue_spec_2)
+      if separation is not None and separation <= max_sequence_separation:
+        continue
+      add_restraints_between_records(record_1, residue_records.get(residue_spec_2), True)
+
+  set_show_extra_restraints(mol_id,0)
+  set_show_extra_restraints(mol_id,1)
+  _status_message("Smart local extra restraints generated: %s added" % added_restraints[0])
+  print "Smart local extra restraints generated: %s added" % added_restraints[0]
+  return added_restraints[0]
+
+def generate_smart_local_extra_restraints():
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  return _generate_smart_local_extra_restraints_for_mol(residue[0])
+
+def generate_smart_local_extra_restraints_with_cutoff(distance_cutoff):
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  try:
+    parsed_cutoff=float(distance_cutoff)
+  except:
+    info_dialog("Minimum interatomic distance must be a number")
+    return None
+  if parsed_cutoff <= 0.0:
+    info_dialog("Minimum interatomic distance must be greater than 0")
+    return None
+  return _generate_smart_local_extra_restraints_for_mol(residue[0], parsed_cutoff)
+
+def prompt_generate_smart_local_extra_restraints():
+  generic_single_entry("Minimum interatomic distance for smart restraints (A)",
+                       "3.7",
+                       "Generate smart self restraints",
+                       generate_smart_local_extra_restraints_with_cutoff)
+
+def confirm_generate_smart_local_extra_restraints():
+  proceed=yes_no_dialog(
+    "Generate smart local extra restraints for the active model?\n\nThis may be slow for large structures.",
+    "Generate restraints")
+  if not proceed:
+    return None
+  return generate_smart_local_extra_restraints()
+
+def jiggle_fit_active_non_polymer_residue():
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  mol_id=residue[0]
+  ch_id=residue[1]
+  resno=residue[2]
+  ins_code=residue[3]
+  if _residue_is_polymer(mol_id, ch_id, resno, ins_code):
+    _status_message("Jiggle fit only applies to non-polymer residues")
+    return None
+  _status_message("Jiggle fitting active non-polymer residue")
+  return fit_to_map_by_random_jiggle(mol_id, ch_id, resno, ins_code, 100, 1.0)
+
+def decrease_proportional_editing_radius_with_status():
+  global PROPORTIONAL_EDITING_RADIUS
+  if PROPORTIONAL_EDITING_RADIUS <= 1.0:
+    PROPORTIONAL_EDITING_RADIUS=1.0
+    _status_message("Proportional editing radius: %.1f A" % PROPORTIONAL_EDITING_RADIUS)
+    return None
+  decrease_proportional_editing_radius()
+  PROPORTIONAL_EDITING_RADIUS=max(1.0, PROPORTIONAL_EDITING_RADIUS-1.0)
+  _status_message("Proportional editing radius: %.1f A" % PROPORTIONAL_EDITING_RADIUS)
+
+def increase_proportional_editing_radius_with_status():
+  global PROPORTIONAL_EDITING_RADIUS
+  if PROPORTIONAL_EDITING_RADIUS >= 1000.0:
+    PROPORTIONAL_EDITING_RADIUS=1000.0
+    _status_message("Proportional editing radius: %.1f A" % PROPORTIONAL_EDITING_RADIUS)
+    return None
+  increase_proportional_editing_radius()
+  PROPORTIONAL_EDITING_RADIUS=min(1000.0, PROPORTIONAL_EDITING_RADIUS+1.0)
+  _status_message("Proportional editing radius: %.1f A" % PROPORTIONAL_EDITING_RADIUS)
+
+def set_proportional_editing_radius():
+  current_radius_string="%.1f" % PROPORTIONAL_EDITING_RADIUS
+  def set_proportional_editing_radius_from_text(text):
+    global PROPORTIONAL_EDITING_RADIUS
+    try:
+      requested_radius=float(text)
+    except ValueError:
+      info_dialog("Radius must be a number")
+      return None
+    if requested_radius < 1.0 or requested_radius > 1000.0:
+      info_dialog("Proportional editing radius must be between 1 and 1000 A")
+      return None
+    target_radius=float(int(round(requested_radius)))
+    while PROPORTIONAL_EDITING_RADIUS < target_radius:
+      increase_proportional_editing_radius()
+      PROPORTIONAL_EDITING_RADIUS=PROPORTIONAL_EDITING_RADIUS+1.0
+    while PROPORTIONAL_EDITING_RADIUS > target_radius:
+      decrease_proportional_editing_radius()
+      PROPORTIONAL_EDITING_RADIUS=max(1.0, PROPORTIONAL_EDITING_RADIUS-1.0)
+    if abs(target_radius-requested_radius) > 0.001:
+      _status_message("Proportional editing radius set to %.1f A (rounded to 1 A steps)" % PROPORTIONAL_EDITING_RADIUS)
+    else:
+      _status_message("Proportional editing radius set to %.1f A" % PROPORTIONAL_EDITING_RADIUS)
+  generic_single_entry("New proportional editing radius (1 A steps)", current_radius_string,
+                       "Set proportional editing radius", set_proportional_editing_radius_from_text)
+
 def display_only_active_map():
   active_map=scroll_wheel_map()
   if not scroll_wheel_map() in map_molecule_list():
@@ -373,6 +1200,26 @@ def display_only_active():
       next_mol=model_molecule_list()[0]
     set_mol_displayed(displayed_mol,0)
     set_mol_displayed(next_mol,1)
+
+#def user_defined_add_3_10_helix_restraints():
+#  def make_restr(*args):
+#    spec_1 = args[0]
+#    spec_2 = args[1]
+#    chain_id_1 = spec_1[2]
+#    chain_id_2 = spec_2[2]
+#    res_no_1   = spec_1[3]
+#    res_no_2   = spec_2[3]
+#    imol       = spec_1[1]
+#    if (chain_id_1 == chain_id_2):
+#      # if backwards, swap 'em
+#      if res_no_2 < res_no_1:
+#        tmp = res_no_1
+#        res_no_1 = res_no_2
+#        res_no_2 = tmp
+#      for rn in range(res_no_1, res_no_2 - 2):
+#        if (rn + 3 <= res_no_2):
+#          add_extra_bond_restraint(imol, chain_id_1, rn    , "", " O  ", "", chain_id_1, rn + 3, "", " N  ", "", 2.91, 0.035)
+#  user_defined_click(2, make_restr)
     
 def step_map_coarse_up(mol_id):
   current_level=get_contour_level_in_sigma(mol_id)
@@ -394,37 +1241,64 @@ def step_map_coarse_down(mol_id):
     new_level=10.0
   set_contour_level_in_sigma(mol_id,new_level)
 
-map_global_view_cycle_var=1
 def toggle_global_map_view():
-  global map_global_view_cycle_var
-  map_id=scroll_wheel_map()
-  current_colour=get_map_colour(map_id)
-  default_colour=[0.19999998807907104, 0.38333338499069214, 0.699999988079071]
-  default_radius=20.0
-  new_colour=[0.4156862795352936, 0.6705882549285889, 0.886274516582489]
-  current_radius=get_map_radius()
-  max_radius=map_cell(map_id)[0]/2
-  if (map_global_view_cycle_var==1) and (map_is_difference_map(map_id)==0):
+  map_id=_scrollable_map_or_status()
+  if map_id is None:
+    return None
+  if map_is_difference_map(map_id)!=0:
+    _status_message("Global map view does not apply to difference maps")
+    return None
+  state=MAP_GLOBAL_VIEW_SETTINGS.get(map_id)
+  if not state or not state.get("enabled"):
+    try:
+      current_colour=map_colour_components(map_id)
+    except:
+      current_colour=get_map_colour(map_id)
+    MAP_GLOBAL_VIEW_SETTINGS[map_id]={
+      "enabled": 1,
+      "colour": current_colour,
+      "radius": get_map_radius()
+    }
+    max_radius=map_cell(map_id)[0]/2.0
     set_draw_solid_density_surface(map_id,1)
     set_draw_map_standard_lines(map_id,0)
+    try:
+      set_solid_density_surface_opacity(map_id,0.8)
+    except:
+      pass
     set_flat_shading_for_solid_density_surface(0)
-    set_map_colour(map_id,new_colour[0],new_colour[1],new_colour[2])
+    set_map_colour(map_id,EM_GLOBAL_MAP_COLOUR[0],EM_GLOBAL_MAP_COLOUR[1],EM_GLOBAL_MAP_COLOUR[2])
     set_map_radius(max_radius)
-    map_global_view_cycle_var=0
-  elif (map_global_view_cycle_var==0) and (map_is_difference_map(map_id)==0):
+    try:
+      set_map_radius_em(max_radius)
+    except:
+      pass
+  else:
     set_draw_solid_density_surface(map_id,0)
     set_draw_map_standard_lines(map_id,1)
-    set_map_colour(map_id,default_colour[0],default_colour[1],default_colour[2])
-    set_map_radius(default_radius)
-    map_global_view_cycle_var=1
+    if state.has_key("colour"):
+      saved_colour=state.get("colour")
+    else:
+      saved_colour=get_map_colour(map_id)
+    set_map_colour(map_id,saved_colour[0],saved_colour[1],saved_colour[2])
+    restored_radius=state.get("radius",20.0)
+    set_map_radius(restored_radius)
+    try:
+      set_map_radius_em(restored_radius)
+    except:
+      pass
+    MAP_GLOBAL_VIEW_SETTINGS[map_id]["enabled"]=0
     
   
 #Go to next residue in current polymer chain.
 def next_res():
-  mol_id=active_residue()[0]
-  ch_id=active_residue()[1]
-  resn=active_residue()[2]
-  atom_name=active_residue()[4]
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  mol_id=residue[0]
+  ch_id=residue[1]
+  resn=residue[2]
+  atom_name=residue[4]
   sn=get_sn_from_resno(mol_id,ch_id,resn)
   next_sn=sn+1
   next_res=seqnum_from_serial_number(mol_id,"%s"%(ch_id),next_sn)
@@ -436,10 +1310,13 @@ def next_res():
 
 #Go to previous residue in current polymer chain.
 def prev_res():
-  mol_id=active_residue()[0]
-  ch_id=active_residue()[1]
-  resn=active_residue()[2]
-  atom_name=active_residue()[4]
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  mol_id=residue[0]
+  ch_id=residue[1]
+  resn=residue[2]
+  atom_name=residue[4]
   sn=get_sn_from_resno(mol_id,ch_id,resn)
   if (sn>=1):
     sn=sn-1
@@ -453,10 +1330,13 @@ def prev_res():
 def mutate_by_entered_code():
   def mutate_single_letter(X):
     entry=str(X).upper()
-    mol_id=active_residue()[0]
-    ch_id=active_residue()[1]
-    resno=active_residue()[2]
-    ins_code=active_residue()[3]
+    residue=_active_residue_or_status()
+    if not residue:
+      return None
+    mol_id=residue[0]
+    ch_id=residue[1]
+    resno=residue[2]
+    ins_code=residue[3]
     resname=residue_name(mol_id,ch_id,resno,ins_code)
     map_id=imol_refinement_map()
     aa_dic={'A':'ALA','R':'ARG','N':'ASN','D':'ASP','C':'CYS','E':'GLU','Q':'GLN','G':'GLY','H':'HIS','I':'ILE','L':'LEU','K':'LYS','M':'MET','F':'PHE','P':'PRO','S':'SER','T':'THR','W':'TRP','Y':'TYR','V':'VAL'}
@@ -485,15 +1365,15 @@ def set_map_level_quickly():
     info_dialog("You need a (scrollable, displayed) map!")
   
 def sequence_context():
-  mol_id=active_residue()[0]
-  ch_id=active_residue()[1]
-  resnum=active_residue()[2]
-  ins_code=active_residue()[3]
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  mol_id=residue[0]
+  ch_id=residue[1]
+  resnum=residue[2]
+  ins_code=residue[3]
   resname=residue_name(mol_id,ch_id,resnum,ins_code)
   def get_aa_code(resnum):
-    mol_id=active_residue()[0]
-    ch_id=active_residue()[1]
-    ins_code=active_residue()[3]
     if residue_name(mol_id,ch_id,resnum,ins_code):
       aa_code=three_letter_code2single_letter(residue_name(mol_id,ch_id,resnum,ins_code))
       if (len(residue_name(mol_id,ch_id,resnum,ins_code))==1):
@@ -553,100 +1433,6 @@ def toggle_toolbar_display():
     show_modelling_toolbar()
     toolbar_toggle_var=0
     
-#Open displayed models and maps in Chimera, set map levels and view
-def open_in_chimera():
-  if find_exe("chimera"): #If chimera exists do stuff, else raise an error
-    import subprocess
-    pwd=os.getcwd() #Dir from which coot was launched
-    cofr=rotation_centre() #3-membered list [x,y,z]
-    make_directory_maybe("coot-chimera") #Put coot droppings here
-    coot_chimera_path=pwd+"/coot-chimera/"
-    check_path=coot_chimera_path+"chimera_launcher.cmd" #Chimera run script that will be written later
-    check_path2=coot_chimera_path+"matrix.txt" #Orientation matrix for chimera input
-    view_number=add_view_here("tmp")
-#     initial_zoom=zoom_factor() #Coot's zoom factor. 100 is the initial state, zooming out gets larger, in gets smaller.
-#     reset_view()
-    zoom=zoom_factor()
-#     go_to_view_number(view_number,1)
-#     scale_factor=initial_zoom/base_zoom
-#     chimera_scale=base_zoom/initial_zoom
-    chimera_scale=100.0/zoom #Approx - breaks down when initial views upon loading mol in Coot or Chimera are different
-    coot_slab_thickness=(0.071*zoom)+2.8612 #Empirically estimated
-    chimera_clip_val=coot_slab_thickness/2.0 #Dist from cofr to clip plane (symmetric)
-    map_radius=get_map_radius() #We'll use this to export a map_radius sized fragment
-    if os.path.isfile(check_path): #if chimera script exists, delete it.
-      os.remove(check_path)
-    if os.path.isfile(check_path2): #same for matrix.txt
-      os.remove(check_path2)
-    map_list=map_molecule_list()
-    mol_list=model_molecule_list()
-    disp_mol_list=[]
-    disp_map_list=[]
-    for mol_id in model_molecule_list():
-      if mol_is_displayed(mol_id):
-        disp_mol_list.append(mol_id) 
-    for map_id in map_molecule_list():
-      if map_is_displayed(mol_id):
-        disp_map_list.append(map_id)   
-    print("disp model list",disp_mol_list)
-    print("disp map list",disp_map_list)
-    set_graphics_window_size(1000,1000)
-    matrix_list=view_matrix() #9-membered list of rotation matrix elements.
-    with open(check_path2,"a") as matrix_file: #Write orientation matrix (specify first pdb as model, then use matrixcopy to apply to all others). Translation vector in last column is 0,0,0 because we will take care of that separately.
-      matrix_file.write("Model {model_id}.0\n".format(model_id=disp_mol_list[0]))
-      matrix_file.write("\t {a} {b} {c} 0.0\n".format(a=matrix_list[0],b=matrix_list[1],c=matrix_list[2]))
-      matrix_file.write("\t {a} {b} {c} 0.0\n".format(a=matrix_list[3],b=matrix_list[4],c=matrix_list[5]))
-      matrix_file.write("\t {a} {b} {c} 0.0\n".format(a=matrix_list[6],b=matrix_list[7],c=matrix_list[8]))
-    with open(check_path,"a") as cmd_file: #Start writing stuff to chimera launch script.
-      for mol_id in model_molecule_list():
-        if mol_is_displayed(mol_id):
-          file_name=coot_chimera_path+"mol_{mol_id}.pdb".format(mol_id=mol_id)
-          write_pdb_file(mol_id,file_name)
-          path_to_file=file_name
-          model_id=mol_id
-          cmd_file.write("open #{model_id} {mol}\n".format(model_id=model_id,mol=path_to_file)) 
-          cmd_file.write("color gold #{model_id}; color byhet #{model_id};  sel #{model_id}; namesel tmp; ~ribbon tmp; ~disp tmp; sel tmp&@CA&protein; repr stick sel; disp sel; sel tmp&~protein; repr stick sel; disp sel;  setattr m stickScale 1.0 tmp;  sel side chain/base.without CA/C1'&tmp; repr stick sel; disp sel; setattr b radius 0.1 sel; color byhet tmp; sel @CA|@CB; namesel tmp2; sel tmp&tmp2; repr stick sel; setattr b radius 0.1 sel; sel @CD,N&:pro&tmp; disp sel; repr stick sel; setattr b radius 0.1 sel; ~sel; disp ~protein\n".format(model_id=model_id)) 
-          cmd_file.write("matrixset matrix.txt\n")
-          cmd_file.write("matrixcopy #{mol_id0} #{mol_id}\n".format(mol_id0=disp_mol_list[0],mol_id=model_id))         
-      map_id0=mol_id
-      for map_id in map_molecule_list():
-        if map_is_displayed(map_id):
-          map_level=get_contour_level_absolute(map_id)
-          if map_is_difference_map(map_id):
-            model_id=map_id0+map_id #make sure that the assigned model number of each map is unique and does not overlap with those of pdbs.
-            if map_id==0:
-              model_id=model_id+1
-            file_name=coot_chimera_path+"diff_map_{model_id}.mrc".format(model_id=model_id)
-            path_to_file=file_name
-            export_map_fragment(map_id,cofr[0],cofr[1],cofr[2],map_radius,file_name)
-            cmd_file.write("open #{model_id} {diff_map} \n".format(model_id=model_id,diff_map=path_to_file))
-            cmd_file.write("volume #{model_id} capfaces false style mesh meshlighting false squaremesh false color \"#08882eefa222\" step 1 ;  sop cap off ;  set depthCue ;  set dcStart 0.2 ;  set dcEnd 1 ;  background solid white ; set showcofr ;  cofr view ;  clip on; volume #{model_id} level -{map_level} color #da1200000000 level {map_level} color #0000bda00000 \n".format(model_id=model_id,map_level=map_level))
-            cmd_file.write("matrixset matrix.txt\n")
-            cmd_file.write("matrixcopy #{mol_id0} #{model_id}\n".format(mol_id0=disp_mol_list[0],model_id=model_id))
-          else:
-            model_id=map_id0+map_id
-            if map_id==0:
-              model_id=model_id+1
-            file_name=coot_chimera_path+"map_{model_id}.mrc".format(model_id=model_id)
-            export_map_fragment(map_id,cofr[0],cofr[1],cofr[2],map_radius,file_name)
-            path_to_file=file_name
-            cmd_file.write("open #{model_id} {map} \n".format(model_id=model_id,map=path_to_file))
-            cmd_file.write("volume #{model_id} capfaces false style mesh meshlighting false squaremesh false color \"#08882eefa222\" step 1 ;  sop cap off ;  set depthCue ;  set dcStart 0.2 ;  set dcEnd 1 ;  background solid white ; set showcofr ;  cofr view ;  clip on; volume #{model_id} level {map_level} \n".format(model_id=model_id,map_level=map_level))
-            cmd_file.write("matrixset matrix.txt\n")
-            cmd_file.write("matrixcopy #{mol_id0} #{model_id}\n".format(mol_id0=disp_mol_list[0],model_id=model_id))
-      cmd_file.write("~sel; set projection orthographic; clip off; cofr {x},{y},{z} coordinatesystem #{mol_id0}; ac mc; center sel; cofr view; cofr fixed; clip hither {clipval} fromCenter true; clip yon -{clipval} fromCenter true; cofr view; clip on; ~set showcofr; del sel; scale {chimera_scale}; windowsize 1000 1000; scene ca_and_sidechains save; disp; scene all_atoms save; scene ca_and_sidechains reset; windowsize 1000 1000".format(x=cofr[0],y=cofr[1],z=cofr[2],mol_id0=disp_mol_list[0],chimera_scale=chimera_scale,clipval=chimera_clip_val))
-      #line above applies translation and scale obtained from coot rotation center and zoom_factor
-    chimera_exe=find_exe("chimera")
-    info_dialog("Opening in Chimera...\nOrientation should be right but you will probably need to \nadjust the scale and clipping to get the same view as in Coot. \n If you can't see anything, try zooming out.")
-    subprocess.Popen(["chimera",check_path])
-  else: 
-    info_dialog("Sorry, you need UCSF Chimera installed and accessible from the terminal for this to work!")
-#This works okay, though adjustment of zoom and clipping still not ideal.
-#would it be possible to add a subprocess.communicate() to use Coot as a controller for Chimera?
-#Hmmm
-#Doesn't work when attempting to open second set of maps loaded, when first set is undisplayed... Fixed! (I think)
-
-
 #Colour active segment
 def colour_active_segment():
   mol_id=active_residue()[0]
@@ -679,204 +1465,231 @@ def colour_active_segment():
   graphics_to_user_defined_atom_colours_representation(mol_id)
 
 
-def color_emringer_outliers(mol_id,map_id):
-  if find_exe("phenix.emringer"):
-    import subprocess
-    import sys
-    mmtbx_path=find_exe("phenix")[:-16]+"modules/cctbx_project/"
-    sys.path.insert(0,mmtbx_path)
-    import mmtbx
-    import cPickle as pickle
-    pwd=os.getcwd()
-    model_name=molecule_name(mol_id)
-    map_name=molecule_name(map_id)
-    make_directory_maybe("coot-emringer")
-    coot_emringer_path=pwd+"/coot-emringer/"
-    output_file_name=coot_emringer_path+"mol_{mol_id}_cablam_output.txt".format(mol_id=mol_id)
-    p=subprocess.Popen("phenix.emringer {model_name} {map_name}".format(model_name=model_name,map_name=map_name),shell=True)
-    p.communicate()
-    emringer_outlier_list=[]
-    emringer_outlier_color=30
-    emringer_outlier_pkl=pwd+"/"+molecule_name_stub(mol_id,2)+"_emringer_plots/Outliers.pkl"
-    outlier_string=str(pickle.load(open(emringer_outlier_pkl,"rb")))
-    with open(output_file_name,"a") as outlier_file: 
-      outlier_file.write(outlier_string)
-    with open(output_file_name) as f:
-      emringer_output = [x.strip('\n') for x in f.readlines()] #make a list of lines in cablam output file, stripping newlines
-      for line in emringer_output:
-        line_list=line.split()
-        if len(line_list)>=5:
-          ch_id=str(line_list[2]) # string.split() defaults to splitting by spaces and making into a list
-          print("ch_id:",ch_id)
-          resid=int(line_list[1]) #If second column has trailing letters (as it will if there is an insertion code) then strip them
-          print("resid",resid)
-          ins_id=""
-          emringer_outlier_color_spec=[([ch_id,resid,ins_id],emringer_outlier_color)]
-          emringer_outlier_list=emringer_outlier_list+emringer_outlier_color_spec
-      print("outlier_list",emringer_outlier_list)
+def _all_residue_specs_for_colouring(mol_id):
+  residue_specs=[]
+  for residue_entry in all_residues_with_serial_numbers(mol_id) or []:
+    if not residue_entry or len(residue_entry) < 4:
+      continue
+    residue_spec=residue_entry[1:]
+    chain_id=residue_spec_to_chain_id(residue_spec)
+    resno=residue_spec_to_res_no(residue_spec)
+    ins_code=residue_spec_to_ins_code(residue_spec)
+    if chain_id is False or resno is False or ins_code is False:
+      continue
+    residue_specs.append([chain_id,resno,ins_code])
+  return residue_specs
+
+def _active_polymer_molecule_for_colouring(action_name):
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  if not _residue_is_polymer(residue[0], residue[1], residue[2], residue[3]):
+    info_dialog(action_name+" requires the active residue to be polymer.")
+    return None
+  return residue[0]
+
+def color_by_rama_native(mol_id):
+  try:
+    rama_results=all_molecule_ramachandran_score(mol_id)
+  except NameError:
+    info_dialog("This Coot build does not expose Ramachandran scores.")
+    return None
+  if not isinstance(rama_results, list) or len(rama_results) < 6:
+    info_dialog("Unable to obtain Ramachandran scores.")
+    return None
+  scored_residues=rama_results[5]
+  blank_colour=0
+  rama_allowed_colour=27
+  rama_outlier_colour=31
+  blank_res_list=[]
+  rama_colour_list=[]
+  for residue_spec in _all_residue_specs_for_colouring(mol_id):
+    blank_res_list.append((residue_spec, blank_colour))
+  for item in scored_residues:
+    if not isinstance(item, list) or len(item) < 3:
+      continue
+    residue_spec=item[1]
+    rama_score=item[2]
+    if not isinstance(residue_spec, list):
+      continue
+    if rama_score < 0.002:
+      rama_colour_list.append((residue_spec[1:], rama_outlier_colour))
+    elif rama_score < 0.02:
+      rama_colour_list.append((residue_spec[1:], rama_allowed_colour))
+  try:
+    clear_user_defined_atom_colours(mol_id)
+    set_user_defined_atom_colour_by_residue_py(mol_id, blank_res_list)
+    set_user_defined_atom_colour_by_residue_py(mol_id, rama_colour_list)
+    graphics_to_user_defined_atom_colours_representation(mol_id)
+    info_dialog("Ramachandran coloring:\n\nRed = outlier (<0.2%)\n\nOrange = allowed/disfavored (<2%)")
+  except NameError:
+    info_dialog("You need a newer Coot build for user-defined residue coloring.")
+
+def color_by_rama_native_for_active_residue():
+  mol_id=_active_polymer_molecule_for_colouring("Ramachandran coloring")
+  if mol_id is None:
+    return None
+  return color_by_rama_native(mol_id)
+
+def color_by_density_fit_native(mol_id):
+  map_id=imol_refinement_map()
+  if map_id==-1:
+    info_dialog("You need a refinement map for density-fit coloring.")
+    return None
+  residue_specs=all_residues_sans_water(mol_id)
+  if not residue_specs:
+    info_dialog("No residues found for density-fit coloring.")
+    return None
+  try:
+    correlation_results=map_to_model_correlation_per_residue(mol_id, residue_specs, 0, map_id)
+  except NameError:
+    info_dialog("This Coot build does not expose native per-residue density fit scores.")
+    return None
+  blank_colour=0
+  blank_res_list=[]
+  density_colour_list=[]
+  for residue_spec in _all_residue_specs_for_colouring(mol_id):
+    blank_res_list.append((residue_spec, blank_colour))
+  for item in correlation_results:
+    if not isinstance(item, list) or len(item) < 2:
+      continue
+    residue_spec=item[0]
+    score=item[1]
+    if not isinstance(residue_spec, list):
+      continue
+    if score < 0.0:
+      score=0.0
+    if score > 1.0:
+      score=1.0
+    colour_index=int((1.0-score)*31+2)
+    density_colour_list.append((residue_spec[1:], colour_index))
+  try:
+    clear_user_defined_atom_colours(mol_id)
+    set_user_defined_atom_colour_by_residue_py(mol_id, blank_res_list)
+    set_user_defined_atom_colour_by_residue_py(mol_id, density_colour_list)
+    graphics_to_user_defined_atom_colours_representation(mol_id)
+    info_dialog("Active molecule colored by model/map correlation, in spectral coloring (blue=CC 1.0, red=CC 0.0)")
+  except NameError:
+    info_dialog("You need a newer Coot build for user-defined residue coloring.")
+
+def color_by_density_fit_native_for_active_residue():
+  mol_id=_active_polymer_molecule_for_colouring("Density-fit coloring")
+  if mol_id is None:
+    return None
+  return color_by_density_fit_native(mol_id)
+
+def color_by_ncs_difference(mol_id):
+  if mol_id not in model_molecule_list():
+    info_dialog("You need an active model for NCS-difference coloring.")
+    return None
+  ncs_data=None
+  target_chain_id=None
+  for chain_id in chain_ids(mol_id):
+    try:
+      diffs=ncs_chain_differences(mol_id, chain_id)
+    except:
+      diffs=False
+    if diffs:
+      ncs_data=diffs
+      target_chain_id=chain_id
+      break
+  if not ncs_data:
+    info_dialog("No NCS-difference data were found for the active molecule.")
+    return None
+
+  blank_colour=0
+  blank_res_list=[]
+  ncs_scores={}
+
+  for residue_spec in _all_residue_specs_for_colouring(mol_id):
+    blank_res_list.append((residue_spec, blank_colour))
+
+  for i in range(0, len(ncs_data), 3):
+    try:
+      peer_chain_id=ncs_data[i]
+      current_target_chain_id=ncs_data[i+1]
+      residue_diffs=ncs_data[i+2]
+    except:
+      continue
+    if not isinstance(residue_diffs, list):
+      continue
+    for residue_diff in residue_diffs:
+      if not isinstance(residue_diff, list) or len(residue_diff) < 3:
+        continue
+      peer_residue=residue_diff[0]
+      target_residue=residue_diff[1]
+      mean_diff=residue_diff[2]
       try:
-        set_user_defined_atom_colour_by_residue_py(mol_id,emringer_outlier_list)
-        graphics_to_user_defined_atom_colours_representation(mol_id)
-      except NameError:
-        info_dialog("You need a newer Coot - custom coloring is only in r6174 and later, sorry.")
-        pass
-  else:
-    info_dialog("Sorry, you need phenix.cablam_validate, sed and awk installed and accessible from the terminal for this to work!")
+        mean_diff=float(mean_diff)
+      except:
+        continue
+      if isinstance(peer_residue, list) and len(peer_residue) >= 2:
+        peer_spec=(peer_chain_id, peer_residue[0], peer_residue[1])
+        ncs_scores[peer_spec]=max(ncs_scores.get(peer_spec, 0.0), mean_diff)
+      if isinstance(target_residue, list) and len(target_residue) >= 2:
+        target_spec=(current_target_chain_id, target_residue[0], target_residue[1])
+        ncs_scores[target_spec]=max(ncs_scores.get(target_spec, 0.0), mean_diff)
 
-def color_by_cablam2(mol_id):
-  if find_exe("phenix.cablam_validate") and find_exe("awk") and find_exe("sed"):
-    import subprocess
-    pwd=os.getcwd() #dir where coot was launched
-    make_directory_maybe("coot-cablam") #Put coot droppings here
-    coot_cablam_path=pwd+"/coot-cablam/"
-    file_name=molecule_name(mol_id)
-    file_name_output=coot_cablam_path+"mol_{mol_id}_cablam_output.txt".format(mol_id=mol_id) #this file will have info on cablam outliers
-#     write_pdb_file(mol_id,file_name) # write a copy of the active mol to the cablam dir
-    p=subprocess.Popen("phenix.cablam_validate {file_name} outlier_cutoff=0.01 | tail -n +2 | awk '{{FS=\":\"}} {{print $1,$2,$5}}' | sed 's/CaBLAM Outlier/1/g' | sed 's/CaBLAM Disfavored/2/g' | sed 's/CA Geom Outlier/3/g' | sed 's/try alpha helix/4/g' | sed 's/try beta sheet/5/g' | sed 's/try three-ten/6/g' | sed 's/[0123456789-]/ &/' > {file_name_output}".format(file_name=file_name,file_name_output=file_name_output),shell=True)
-    p.communicate() #wait for cablam to finish
-    cablam_outlier_list=[]
-    cablam_beta_list=[]
-    cablam_alpha_list=[]
-    cablam_3_10_list=[]
-    cablam_disfavored_list=[]
-    cablam_outlier_colour=30
-    cablam_disfavored_colour=27
-    cablam_alpha_colour=10
-    cablam_beta_colour=39
-    cablam_3_10_colour=15
-    cablam_ca_geom_colour=10
-    blank_colour=0
-    outlier_flag=0
-    with open(file_name_output) as f:
-      cablam_output = [x.strip('\n') for x in f.readlines()] #make a list of lines in cablam output file, stripping newlines
-      for line in cablam_output:
-        line_list=line.split()
-        if len(line_list)>=3:
-          ch_id=line_list[0] # string.split() defaults to splitting by spaces and making into a list
-          resid=int(line_list[1].rstrip('abcdefghjklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ')) #If second column has trailing letters (as it will if there is an insertion code) then strip them
-          ins_id=str(line_list[1].lstrip('0123456789')) #If second column has trailing characters, these correspond to the insertion code. Strip leading numbers.
-          resname=line_list[2]
-          if len(line_list)>3:
-            outlier_flag=int(line_list[3]) #1 is Cablam outlier 2 is cablam disfavored, and 3 is ca geom outlier
-            if outlier_flag==1: #CaBLAM outliers
-              cablam_outlier_colour_spec=[([ch_id,resid,ins_id],cablam_outlier_colour)]
-              cablam_outlier_list=cablam_outlier_list+cablam_outlier_colour_spec
-            elif outlier_flag==2: #CaBLAM disfavored
-              cablam_outlier_colour_spec=[([ch_id,resid,ins_id],cablam_disfavored_colour)]
-              cablam_outlier_list=cablam_outlier_list+cablam_outlier_colour_spec
-            elif outlier_flag==3: #CaBLAM disfavored
-              cablam_outlier_colour_spec=[([ch_id,resid,ins_id],cablam_ca_geom_colour)]
-              cablam_outlier_list=cablam_outlier_list+cablam_outlier_colour_spec
-            elif outlier_flag==4: #alpha
-              cablam_outlier_colour_spec=[([ch_id,resid,ins_id],cablam_alpha_colour)]
-              cablam_outlier_list=cablam_outlier_list+cablam_outlier_colour_spec
-            elif outlier_flag==5: #beta
-              cablam_outlier_colour_spec=[([ch_id,resid,ins_id],cablam_beta_colour)]
-              cablam_outlier_list=cablam_outlier_list+cablam_outlier_colour_spec
-            elif outlier_flag==6: #3-10 helix
-              cablam_outlier_colour_spec=[([ch_id,resid,ins_id],cablam_3_10_colour)]
-              cablam_outlier_list=cablam_outlier_list+cablam_outlier_colour_spec
-            else:
-              cablam_outlier_colour_spec=[([ch_id,resid,ins_id],blank_colour)]
-              cablam_outlier_list=cablam_outlier_list+cablam_outlier_colour_spec
-          else:
-            cablam_outlier_colour_spec=[([ch_id,resid,ins_id],blank_colour)]
-            cablam_outlier_list=cablam_outlier_list+cablam_outlier_colour_spec 
-#     os.remove(file_name)
-    os.remove(file_name_output)
-    try:
-      set_user_defined_atom_colour_by_residue_py(mol_id,cablam_outlier_list)
-      graphics_to_user_defined_atom_colours_representation(mol_id)
-      info_dialog("CaBLAM coloring scheme (predicted SS and outliers): \n  \n Teal = alpha \n \n Green = 3-10 \n \n Purple = beta \n \n Yellow = Ca geometry outlier \n \n Orange = CaBLAM disfavored (5% cutoff) \n \n Red = CaBLAM outlier (1% cutoff)")
-    except NameError:
-      info_dialog("You need a newer Coot - custom coloring is only in r6174 and later, sorry.")
-      pass
-  else:
-    info_dialog("Sorry, you need phenix.cablam_validate, sed and awk installed and accessible from the terminal for this to work!")
+  if not ncs_scores:
+    info_dialog("No NCS-difference values were available for coloring.")
+    return None
 
-def color_by_rama(mol_id):
-  if find_exe("phenix.ramalyze") and find_exe("awk") and find_exe("sed"):
-    import subprocess
-    pwd=os.getcwd() #dir where coot was launched
-    make_directory_maybe("coot-ramalyze") #Put coot droppings here
-    coot_ramalyze_path=pwd+"/coot-ramalyze/"
-    file_name=molecule_name(mol_id)
-    file_name_output=coot_ramalyze_path+"mol_{mol_id}_ramalyze_output.txt".format(mol_id=mol_id) #this file will have info on ramalyze outliers
-#     write_pdb_file(mol_id,file_name) # write a copy of the active mol to the ramalyze dir
-    p=subprocess.Popen("phenix.ramalyze {file_name} outliers_only=true rama_potential=emsley | awk '{{FS=\":\"}} {{print $1}}' | sed 's/[0123456789-]/ &/' | awk '{{if (NF==3) print}}' > {file_name_output}".format(file_name=file_name,file_name_output=file_name_output),shell=True)
-    p.communicate() #wait for ramalyze to finish
-    ramalyze_outlier_list=[]
-    ramalyze_outlier_colour=34
-    blank_res_list=[]
-    blank_colour=0
-    for ch_id in chain_ids(mol_id):
-      sn_max=chain_n_residues(ch_id,mol_id)
-      for sn in range(0,sn_max+1):
-        resn=seqnum_from_serial_number(mol_id,ch_id,sn)
-        ins_id=str(insertion_code_from_serial_number(mol_id,ch_id,sn))
-        residue_to_color=[([ch_id,resn,ins_id],blank_colour)]
-        blank_res_list=blank_res_list+residue_to_color
-    with open(file_name_output) as f:
-      ramalyze_output = [x.strip('\n') for x in f.readlines()] #make a list of lines in ramalyze output file, stripping newlines
-      for line in ramalyze_output:
-        line_list=line.split()
-        ch_id=line_list[0] # string.split() defaults to splitting by spaces and making into a list
-        resid=int(line_list[1].rstrip('abcdefghjklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ')) #If second column has trailing letters (as it will if there is an insertion code) then strip them
-        ins_id=str(line_list[1].lstrip('0123456789')) #If second column has trailing characters, these correspond to the insertion code. Strip leading numbers.
-        resname=line_list[2]
-        ramalyze_outlier_colour_spec=[([ch_id,resid,ins_id],ramalyze_outlier_colour)]
-        ramalyze_outlier_list=ramalyze_outlier_list+ramalyze_outlier_colour_spec
-#     os.remove(file_name)
-    os.remove(file_name_output)
-    try:
-      set_user_defined_atom_colour_by_residue_py(mol_id,blank_res_list)
-      set_user_defined_atom_colour_by_residue_py(mol_id,ramalyze_outlier_list)
-      graphics_to_user_defined_atom_colours_representation(mol_id)
-    except NameError:
-      info_dialog("You need a newer Coot - custom coloring is only in r6174 and later, sorry.")
-      pass
-  else:
-    info_dialog("Sorry, you need phenix.ramalyze, sed and awk installed and accessible from the terminal for this to work!")
+  ncs_colour_list=[]
+  for residue_spec, mean_diff in ncs_scores.items():
+    normalized_score=mean_diff/2.0
+    if normalized_score < 0.0:
+      normalized_score=0.0
+    if normalized_score > 1.0:
+      normalized_score=1.0
+    colour_index=int(normalized_score*31+2)
+    ncs_colour_list.append(([residue_spec[0], residue_spec[1], residue_spec[2]], colour_index))
 
-def color_by_cc(mol_id):
-  if find_exe("phenix.model_map_cc") and find_exe("awk") and find_exe("sed") and find_exe("grep") and imol_refinement_map()!=-1 and space_group(imol_refinement_map())=="P 1":
-    import subprocess
-    pwd=os.getcwd() #dir where coot was launched
-    make_directory_maybe("coot-cc") #Put coot droppings here
-    coot_cc_path=pwd+"/coot-cc/"
-    pdb_name=molecule_name(mol_id)
-    map_id=int(imol_refinement_map())
-    map_name=molecule_name(map_id)
-#     write_pdb_file(mol_id,pdb_name) # write a copy of the active mol to the cc dir
-    if not (map_name.endswith(".ccp4") or map_name.endswith(".mrc") or map_name.endswith(".map")):
-      map_name=coot_cc_path+"mol_{mol_id}.ccp4".format(mol_id=mol_id)
-      export_map(map_id,map_name)
-    file_name_output=coot_cc_path+"mol_{mol_id}_cc_output.txt".format(mol_id=mol_id) #this file will have info on cc outliers
-    p=subprocess.Popen("phenix.model_map_cc {pdb_name} {map_name} resolution=4.0 | awk '{{if (NF==7) print}}' | grep chain > {file_name_output}".format(pdb_name=pdb_name,map_name=map_name,file_name_output=file_name_output),shell=True)
-    p.communicate() #wait for cc to finish
-    cc_list=[]
-    with open(file_name_output) as f:
-      cc_output = [x.strip('\n') for x in f.readlines()] #make a list of lines in cc output file, stripping newlines
-      for line in cc_output:
-        line_list=line.split()
-        ch_id=line_list[2] # string.split() defaults to splitting by spaces and making into a list
-        resid=int(line_list[4].rstrip('abcdefghjklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ')) #If second column has trailing letters (as it will if there is an insertion code) then strip them
-        ins_id=str(line_list[4].lstrip('0123456789')) #If second column has trailing characters, these correspond to the insertion code. Strip leading numbers.
-        cc=float(line_list[6])
-        if cc<0.0:
-          cc=0.0
-        cc_colour=int((1.0-cc)*31+2)
-        print("cc=",cc,"color=",cc_colour)
-        cc_colour_spec=[([ch_id,resid,ins_id],cc_colour)]
-        cc_list=cc_list+cc_colour_spec
-    try:
-      set_user_defined_atom_colour_by_residue_py(mol_id,cc_list)
-      graphics_to_user_defined_atom_colours_representation(mol_id)
-    except NameError:
-      info_dialog("You need a newer Coot - custom coloring is only in r6188 and later, sorry.")
-      pass
-  else:
-    info_dialog("Sorry, you need phenix.model_map_cc, sed and awk installed and accessible from the terminal for this to work! Also, needs to be P1 map right now, sorry.")
+  try:
+    clear_user_defined_atom_colours(mol_id)
+    set_user_defined_atom_colour_by_residue_py(mol_id, blank_res_list)
+    set_user_defined_atom_colour_by_residue_py(mol_id, ncs_colour_list)
+    graphics_to_user_defined_atom_colours_representation(mol_id)
+    info_dialog("Active molecule colored by NCS difference, in spectral coloring (blue=low difference, red=high difference)")
+  except NameError:
+    info_dialog("You need a newer Coot build for user-defined residue coloring.")
+
+def color_by_ncs_difference_for_active_residue():
+  mol_id=_active_polymer_molecule_for_colouring("NCS-difference coloring")
+  if mol_id is None:
+    return None
+  return color_by_ncs_difference(mol_id)
+
+def show_custom_keybindings_summary():
+  info_dialog(
+    "Custom keybindings\n\n"
+    "G  Toggle global map view\n"
+    "A  Refine zone (click 2 atoms)\n"
+    "a  Local cylinder refine\n"
+    "b  Go to nearest density peak\n"
+    "C  Copy active ligand/ion/solvent\n"
+    "V  Paste copied ligand/ion/solvent\n"
+    "g  Generate smart local extra restraints\n"
+    "h  Place helix here\n"
+    "J  Jiggle-fit active non-polymer residue\n"
+    "m  Measure distance\n"
+    "o  Go to next NCS chain\n"
+    "O  Go to NCS master chain\n"
+    "q  Flip peptide\n"
+    "r  Refine triple\n"
+    "v  Undo symmetry view\n"
+    "w/W  Add water / add water + refine\n"
+    "y/Y/T  Add terminal residue / cycle terminus phi / psi\n"
+    "z/x  Undo / redo\n"
+    "Z  Clear labels and distances\n"
+    "[ ]  Cycle representation mode\n"
+    "{ }  Cycle symmetry representation mode\n"
+    "; and '  Decrease / increase map radius\n"
+    "! to (  Set map to 1-9 sigma\n"
+    "- and =  Increase / decrease map contour by 0.1 sigma\n"
+    "? / ~  Show only active model / map\n"
+    "backtick / slash  Toggle map / model display\n"
+    "< >  Previous / next residue in chain"
+  )
     
 
 #Set refinement map to currently scrollable map
@@ -915,6 +1728,13 @@ def toggle_mol_display():
 
 #Cycle representation mode forward/back
 cycle_rep_flag={0:0}
+def cycle_rep_up_active():
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  mol_id=residue[0]
+  return cycle_rep_up(mol_id, cycle_rep_flag.get(mol_id,0))
+
 def cycle_rep_up(mol_id,flag):
   global cycle_rep_flag
   cycle_rep_flag[mol_id]=flag
@@ -991,6 +1811,13 @@ def cycle_rep_down(mol_id,flag):
     graphics_to_rainbow_representation(mol_id)
     cycle_rep_flag[mol_id]=3
 
+def cycle_rep_down_active():
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  mol_id=residue[0]
+  return cycle_rep_down(mol_id, cycle_rep_flag.get(mol_id,0))
+
 
 #Refine triple (Paul)
 def key_binding_refine_triple():
@@ -1011,6 +1838,13 @@ def key_binding_refine_triple():
     
 #Cycle symmetry represntation mode forward/back
 cycle_symm_flag={0:0}
+def cycle_symm_up_active():
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  mol_id=residue[0]
+  return cycle_symm_up(mol_id, cycle_symm_flag.get(mol_id,0))
+
 def cycle_symm_up(mol_id,flag):
   global cycle_symm_flag
   cycle_symm_flag[mol_id]=flag
@@ -1059,13 +1893,26 @@ def cycle_symm_down(mol_id,flag):
     symmetry_as_calphas(mol_id,0)
     set_symmetry_whole_chain(mol_id,0)
     cycle_symm_flag[mol_id]=3
+
+def cycle_symm_down_active():
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  mol_id=residue[0]
+  return cycle_symm_down(mol_id, cycle_symm_flag.get(mol_id,0))
     
 def undo_visible():
-  set_undo_molecule(active_residue()[0])
+  mol_id=_active_molecule_or_status()
+  if mol_id is None:
+    return None
+  set_undo_molecule(mol_id)
   apply_undo()
   
 def redo_visible():
-  set_undo_molecule(active_residue()[0])
+  mol_id=_active_molecule_or_status()
+  if mol_id is None:
+    return None
+  set_undo_molecule(mol_id)
   apply_redo()
 
 #Cycle rotamers for active residue
@@ -1283,10 +2130,13 @@ def last_residue_in_seg(mol_id,ch_id,resno):
 
 #Get serial number of active residue
 def sn_of_active_res():
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
   sn=0
-  resn_to_match=active_residue()[2]
-  mol_id=active_residue()[0]
-  ch_id=active_residue()[1]
+  resn_to_match=residue[2]
+  mol_id=residue[0]
+  ch_id=residue[1]
   current_resn=seqnum_from_serial_number(mol_id,"%s"%(ch_id),sn)
   while (current_resn!=resn_to_match):
     sn=sn+1
@@ -1343,33 +2193,74 @@ def segment_list_chain(mol_id,ch_id):
   
     
 #rigid body refine zone here +/- n+1, then real space refine zone here +/-n
-def auto_refine(n):
-  mol_id=active_residue()[0]
-  ch_id=active_residue()[1]
-  resno=active_residue()[2]
-  altloc=active_residue()[5]
-  res_start=resno
-  res_end=resno
-  i=0
-  fpr=first_polymer_residue(mol_id,ch_id)
-  lpr=last_polymer_residue(mol_id,ch_id)
-  while not (is_term_type_mn(mol_id,ch_id,res_start) or res_start==fpr or i==n):
-    res_start=res_start-1
-    i=i+1
-  i=0
-  while not (is_term_type_mc(mol_id,ch_id,res_end) or res_end==lpr or i==n):
-    res_end=res_end+1
-    i=i+1
-  rigid_body_refine_zone(res_start,res_end,ch_id,mol_id)
-  accept_regularizement()
-  refine_zone(mol_id,ch_id,res_start,res_end,altloc)
+def auto_refine():
+  if imol_refinement_map()==-1:
+    info_dialog("You must set a refinement map!")
+    return None
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  mol_id=residue[0]
+  ch_id=residue[1]
+  resno=residue[2]
+  active_ins_code=residue[3]
+  half_window=5
+  contact_radius=4.0
+  max_gap_to_fill=4
+  minimum_fragment_size=3
+  main_range_specs=set()
+  seed_residue_specs=[]
+
+  if _residue_is_polymer(mol_id, ch_id, resno, active_ins_code):
+    fpr=first_polymer_residue(mol_id,ch_id)
+    lpr=last_polymer_residue(mol_id,ch_id)
+    res_start=max(fpr, resno-half_window)
+    res_end=min(lpr, resno+half_window)
+    for resn in range(res_start, res_end+1):
+      if residue_exists_qm(mol_id,ch_id,resn,""):
+        main_range_specs.add((ch_id,resn,""))
+        seed_residue_specs.append([ch_id,resn,""])
+  else:
+    if not residue_exists_qm(mol_id, ch_id, resno, active_ins_code):
+      _status_message("No active residue for local cylinder refinement")
+      return None
+    main_range_specs.add((ch_id,resno,active_ins_code))
+    seed_residue_specs.append([ch_id,resno,active_ins_code])
+
+  secondary_residue_specs=set()
+  direct_non_polymer_contact_specs=set()
+  for spec in seed_residue_specs:
+    nearby_residues=residues_near_residue(mol_id, spec, contact_radius) or []
+    for nearby_residue in nearby_residues:
+      if nearby_residue and len(nearby_residue)==3:
+        nearby_spec=(nearby_residue[0], nearby_residue[1], nearby_residue[2])
+        if nearby_spec not in main_range_specs:
+          secondary_residue_specs.add(nearby_spec)
+          if not _residue_is_polymer(mol_id, nearby_spec[0], nearby_spec[1], nearby_spec[2]):
+            direct_non_polymer_contact_specs.add(nearby_spec)
+
+  secondary_polymer_specs=set([spec for spec in secondary_residue_specs
+                               if _residue_is_polymer(mol_id, spec[0], spec[1], spec[2])])
+  secondary_non_polymer_specs=(secondary_residue_specs-secondary_polymer_specs) | direct_non_polymer_contact_specs
+  if not _residue_is_polymer(mol_id, ch_id, resno, active_ins_code):
+    secondary_polymer_specs=_expand_polymer_contact_windows(mol_id, secondary_polymer_specs, 1)
+  secondary_polymer_specs=_fill_short_polymer_gaps(mol_id, secondary_polymer_specs, max_gap_to_fill)
+  secondary_polymer_specs=_prune_small_polymer_fragments(mol_id, secondary_polymer_specs, minimum_fragment_size)
+
+  selected_residue_specs=main_range_specs | secondary_polymer_specs | secondary_non_polymer_specs
+  residue_list=_sorted_residue_specs(selected_residue_specs)
+  refine_residues(mol_id, residue_list)
+  _status_message("Local cylinder refinement started")
    
 
 #**** "Custom menu item functions ****
 #Deletes active chain
 def delete_chain():
-  active_chain_id=active_residue()[1]
-  active_mol_id=active_residue()[0]
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  active_chain_id=residue[1]
+  active_mol_id=residue[0]
   turn_off_backup(active_mol_id)
   while (is_polymer(active_mol_id,active_chain_id)==1) or (
   is_solvent_chain_p(active_mol_id,active_chain_id)!=-1):
@@ -1380,7 +2271,9 @@ def delete_chain():
 
 #Fits all polymer chains to map
 def rigid_fit_all_chains():
-  mol_id=active_residue()[0]
+  mol_id=_active_molecule_or_status()
+  if mol_id is None:
+    return None
   turn_off_backup(mol_id)
   for ch_id in chain_ids(mol_id): #Rigid body refine each chain
     if is_polymer(mol_id,ch_id)==1:
@@ -1390,20 +2283,29 @@ def rigid_fit_all_chains():
   
 #Fits active chain to map
 def rigid_fit_active_chain():
-  mol_id=active_residue()[0]
-  ch_id=active_residue()[1]
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  mol_id=residue[0]
+  ch_id=residue[1]
   rigid_body_refine_by_atom_selection(mol_id, "//%s//"%(ch_id))
   
 #Copies active chain
 def copy_active_chain():
-  mol_id=active_residue()[0]
-  ch_id=active_residue()[1]
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  mol_id=residue[0]
+  ch_id=residue[1]
   new_molecule_by_atom_selection(mol_id, "//%s//"%(ch_id))
   
 #Cuts active chain
 def cut_active_chain():
-  mol_id=active_residue()[0]
-  ch_id=active_residue()[1]
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  mol_id=residue[0]
+  ch_id=residue[1]
   new_molecule_by_atom_selection(mol_id, "//%s//"%(ch_id))
   turn_off_backup(mol_id)
   while (is_polymer(mol_id,ch_id)==1) or (is_solvent_chain_p(mol_id,ch_id)!=-1):
@@ -1441,10 +2343,13 @@ def fast_rigid_fit(res_start,res_end,ch_id,mol_id):
 
 #Copy active segment
 def copy_active_segment():
-  mol_id=active_residue()[0]
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  mol_id=residue[0]
   segments=segment_list(mol_id)
-  res_here=active_residue()[2]
-  ch_id=active_residue()[1]
+  res_here=residue[2]
+  ch_id=residue[1]
   for seg in segments:
     if (res_here>=seg[2]) and (res_here<=seg[3]) and (ch_id==seg[1]):
       res_start=seg[2]
@@ -1454,10 +2359,13 @@ def copy_active_segment():
 
 #Cut active segment
 def cut_active_segment():
-  mol_id=active_residue()[0]
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  mol_id=residue[0]
   segments=segment_list(mol_id)
-  res_here=active_residue()[2]
-  ch_id=active_residue()[1]
+  res_here=residue[2]
+  ch_id=residue[1]
   for seg in segments:
     if (res_here>=seg[2]) and (res_here<=seg[3]) and (ch_id==seg[1]):
       res_start=seg[2]
@@ -1468,10 +2376,13 @@ def cut_active_segment():
 
 #Delete active segment
 def delete_active_segment():
-  mol_id=active_residue()[0]
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  mol_id=residue[0]
   segments=segment_list(mol_id)
-  res_here=active_residue()[2]
-  ch_id=active_residue()[1]
+  res_here=residue[2]
+  ch_id=residue[1]
   for seg in segments:
     if (res_here>=seg[2]) and (res_here<=seg[3]) and (ch_id==seg[1]):
       res_start=seg[2]
@@ -1485,8 +2396,11 @@ def jiggle_fit_active_chain():
   if (imol_refinement_map()==-1):
     info_dialog("You must set a refinement map!")
   else:
-    mol_id=active_residue()[0]
-    ch_id=active_residue()[1]
+    residue=_active_residue_or_status()
+    if not residue:
+      return None
+    mol_id=residue[0]
+    ch_id=residue[1]
     fit_chain_to_map_by_random_jiggle(mol_id,ch_id,1000,0.1)
 
 #Jiggle-fit active chain to B-smoothed map
@@ -1495,8 +2409,12 @@ def jiggle_fit_active_chain_smooth():
     info_dialog("You must set a refinement map!")
   else:
     sharpen(imol_refinement_map(),200)
-    mol_id=active_residue()[0]
-    ch_id=active_residue()[1]
+    residue=_active_residue_or_status()
+    if not residue:
+      sharpen(imol_refinement_map(),0)
+      return None
+    mol_id=residue[0]
+    ch_id=residue[1]
     fit_chain_to_map_by_random_jiggle(mol_id,ch_id,1000,0.1)
     sharpen(imol_refinement_map(),0)
     
@@ -1519,7 +2437,9 @@ def jiggle_fit_all_chains():
   if (imol_refinement_map()==-1):
     info_dialog("You must set a refinement map!")
   else:
-    mol_id=active_residue()[0]
+    mol_id=_active_molecule_or_status()
+    if mol_id is None:
+      return None
     turn_off_backup(mol_id)
     for ch_id in chain_ids(mol_id): #Rigid body refine each chain
       if is_polymer(mol_id,ch_id)==1:
@@ -1532,17 +2452,24 @@ def jiggle_fit_active_mol():
   if (imol_refinement_map()==-1):
     info_dialog("You must set a refinement map!")
   else:
-    mol_id=active_residue()[0]
+    mol_id=_active_molecule_or_status()
+    if mol_id is None:
+      return None
     fit_molecule_to_map_by_random_jiggle(mol_id,1000,0.1)
     
 #Clear labels and distances
 def clear_distances_and_labels():
   remove_all_atom_labels()
-  clear_simple_distances()
+  try:
+    clear_measure_distances()
+  except:
+    clear_simple_distances()
   
 #Delete hydrogens from active molecule
 def delete_h_active():
-  mol_id=active_residue()[0]
+  mol_id=_active_molecule_or_status()
+  if mol_id is None:
+    return None
   delete_hydrogens(mol_id)
   
 #click the start and end point, then fit the gap between them with polyala
@@ -1678,7 +2605,6 @@ def refine_click():
       refine_zone(mol_id_1,ch_id_1,resno_2,resno_1,alt_conf_1)
   user_defined_click(2,refine_click_a)
   
-#Use refine residues rather than refine zone because refine_residues knows about disulfides etc.
 def refine_residues_click():
   def refine_residues_click_a(res1,res2):
     mol_id_1=res1[1]
@@ -1688,18 +2614,10 @@ def refine_residues_click():
     resno_1=res1[3]
     resno_2=res2[3]
     ins_code_1=res1[6]
-    ins_code_2=res2[6]
     if (mol_id_1==mol_id_2) and (ch_id_1==ch_id_2):
       if resno_1>=resno_2:
         resno_1,resno_2=resno_2,resno_1 #Swap res numbers if wrong way round
-      res_list=[]
-      for resn in range(resno_1,resno_2+1):
-        res_triple=[ch_id_1,resn,ins_code_1] #Does not account for varying ins code. Should be able to fix using residues_matching_criteria(), e.g.:
-        #residues_matching_criteria(0, lambda chain_id,resno,ins_code,serial: True), except substitute a test func for true
-        #that evaluates to true if resno, mol id and ch_id match, and returns ins_code (third item in output triple)
-        res_list.append(res_triple) #append rather than adding, bc making list of lists
-      refine_residues(mol_id_1,res_list)
-      print(res_list)
+      refine_zone(mol_id_1,ch_id_1,resno_1,resno_2,ins_code_1)
     else:
       info_dialog("Sorry, start and end residues must be in same mol and chain!")
   user_defined_click(2,refine_residues_click_a)
@@ -2785,8 +3703,13 @@ def all_mols_to_ca():
     
 #Set b-factor color scaling based on mean B of active mol
 def autoscale_b_factor():
-  mol_id=active_residue()[0]
+  mol_id=_active_molecule_or_status()
+  if mol_id is None:
+    return None
   mean_b=average_temperature_factor(mol_id)
+  if mean_b <= 0.0:
+    info_dialog("Mean B-factor is not positive for the active molecule.")
+    return None
   scale_fac=50/mean_b
   set_b_factor_bonds_scale_factor(mol_id,scale_fac)
   graphics_to_b_factor_representation(mol_id)
@@ -2798,22 +3721,32 @@ def color_rotamer_outliers_and_missing_atoms(mol_id):
   rotamer_outlier_list=[]
   rotamer_outlier_colour=34
   blank_colour=0
-  for x in missing_atom_info(mol_id):
-    missing_atoms_spec=[(x,missing_atoms_colour)]
+  blank_res_list=[]
+  residue_specs=all_residues_sans_water(mol_id) or []
+  for residue_spec in residue_specs:
+    if not residue_spec or len(residue_spec) < 3:
+      continue
+    ch_id=residue_spec_to_chain_id(residue_spec)
+    resn=residue_spec_to_res_no(residue_spec)
+    ins_code=residue_spec_to_ins_code(residue_spec)
+    if ch_id is False or resn is False or ins_code is False:
+      continue
+    blank_res_list.append(([ch_id,resn,ins_code],blank_colour))
+    resname=residue_name(mol_id,ch_id,resn,ins_code)
+    if resname in ["ALA","GLY","UNK","HOH"]:
+      continue
+    rot_prob=rotamer_score(mol_id,ch_id,resn,ins_code,"")
+    if rot_prob<0.5 and rot_prob>0.0:
+      rotamer_outlier_spec=[([ch_id,resn,ins_code],rotamer_outlier_colour)]
+      rotamer_outlier_list=rotamer_outlier_list+rotamer_outlier_spec
+  for x in missing_atom_info(mol_id) or []:
+    if not x or len(x) < 3:
+      continue
+    missing_atoms_spec=[([x[0],x[1],x[2]],missing_atoms_colour)]
     missing_atoms_list=missing_atoms_list+missing_atoms_spec
-  for ch_id in chain_ids(mol_id):
-    first_res=first_residue(mol_id,ch_id)
-    last_res=last_residue(mol_id,ch_id)
-    for resn in range(first_res,last_res):
-      if residue_exists_qm(mol_id,ch_id,resn,""):
-        rot_prob=rotamer_score(mol_id,ch_id,resn,"","")
-        if rot_prob<0.5 and rot_prob>0.0:
-          rotamer_outlier_spec=[([ch_id,resn,""],rotamer_outlier_colour)]
-          rotamer_outlier_list=rotamer_outlier_list+rotamer_outlier_spec
-        else:
-          rotamer_outlier_spec=[([ch_id,resn,""],blank_colour)]
-          rotamer_outlier_list=rotamer_outlier_list+rotamer_outlier_spec
   try:
+    clear_user_defined_atom_colours(mol_id)
+    set_user_defined_atom_colour_by_residue_py(mol_id,blank_res_list)
     set_user_defined_atom_colour_by_residue_py(mol_id,rotamer_outlier_list)
     set_user_defined_atom_colour_by_residue_py(mol_id,missing_atoms_list)
     graphics_to_user_defined_atom_colours_representation(mol_id)
@@ -3815,39 +4748,6 @@ def return_seq_as_string(mol_id,ch_id):
     seq=seq+aa_code
   return seq
 
-stereo_gif_counter=1
-def make_rot_gif():
-  if find_exe("convert"):
-    global stereo_gif_counter
-    import subprocess
-    pwd=os.getcwd()
-    set_rotation_center_size(0)
-    set_draw_axes(0)
-    rotate_y_scene(1,-2)
-    screendump_image("{pwd}/pair1_tmp.ppm".format(pwd=pwd))
-    rotate_y_scene(1,1)
-    screendump_image("{pwd}/pair2_tmp.ppm".format(pwd=pwd))
-    rotate_y_scene(1,1)
-    screendump_image("{pwd}/pair3_tmp.ppm".format(pwd=pwd))
-    rotate_y_scene(1,1)
-    screendump_image("{pwd}/pair4_tmp.ppm".format(pwd=pwd))
-    rotate_y_scene(1,1)
-    screendump_image("{pwd}/pair5_tmp.ppm".format(pwd=pwd))
-    rotate_y_scene(1,-2)
-    p=subprocess.Popen("convert -scale 500 -normalize -fuzz 5% -delay 8 -loop 0 -layers Optimize {pwd}/pair1_tmp.ppm {pwd}/pair2_tmp.ppm {pwd}/pair3_tmp.ppm {pwd}/pair4_tmp.ppm {pwd}/pair5_tmp.ppm {pwd}/pair4_tmp.ppm {pwd}/pair3_tmp.ppm {pwd}/pair2_tmp.ppm {pwd}/stereo_density_{stereo_gif_counter}.gif".format(pwd=pwd,stereo_gif_counter=stereo_gif_counter),shell=True) 
-    p.communicate()
-    stereo_gif_counter=stereo_gif_counter+1
-    os.remove("{pwd}/pair1_tmp.ppm".format(pwd=pwd))
-    os.remove("{pwd}/pair2_tmp.ppm".format(pwd=pwd))
-    os.remove("{pwd}/pair3_tmp.ppm".format(pwd=pwd))
-    os.remove("{pwd}/pair4_tmp.ppm".format(pwd=pwd))
-    os.remove("{pwd}/pair5_tmp.ppm".format(pwd=pwd))
-    set_rotation_center_size(0.1)
-    set_draw_axes(1)
-  else:
-    info_dialog("You need Imagemagick to use this!")
-    
-    
 def find_sequence_in_current_chain(subseq):
   subseq=subseq.upper()
   mol_id=active_residue()[0]
@@ -3972,6 +4872,9 @@ def user_defined_add_arbitrary_length_bond_restraint(bond_length=2.0):
 
 menu=coot_menubar_menu("Custom")
 
+add_simple_coot_menu_menuitem(menu,
+"Custom keybindings...", lambda func: show_custom_keybindings_summary())
+
 #make submenus
 
 submenu_display=gtk.Menu()
@@ -3979,6 +4882,12 @@ menuitem_2=gtk.MenuItem("Display...")
 menuitem_2.set_submenu(submenu_display)
 menu.append(menuitem_2)
 menuitem_2.show()
+
+submenu_colour=gtk.Menu()
+menuitem_2b=gtk.MenuItem("Colour...")
+menuitem_2b.set_submenu(submenu_colour)
+menu.append(menuitem_2b)
+menuitem_2b.show()
 
 
 submenu_fit=gtk.Menu()
@@ -4050,50 +4959,45 @@ lambda func: clear_distances_and_labels())
 add_simple_coot_menu_menuitem(submenu_display,
 "Switch all mols to CA representation",lambda func: all_mols_to_ca())
 
-add_simple_coot_menu_menuitem(submenu_display,
-"Color active mol by rotamer prob (outliers magenta) and missing atoms (blue)", lambda func: color_rotamer_outliers_and_missing_atoms(active_residue()[0]))
+add_simple_coot_menu_menuitem(submenu_colour,
+"Color active mol by rotamer prob (outliers magenta) and missing atoms (blue)", lambda func: color_rotamer_outliers_and_missing_atoms_for_active_molecule())
 
-add_simple_coot_menu_menuitem(submenu_display,
-"Color active mol by hydrophobics (orange), polars (blue), glys (magenta) and pros (green)", lambda func: color_polars_and_hphobs(active_residue()[0]))
+add_simple_coot_menu_menuitem(submenu_colour,
+"Color active mol by hydrophobics (orange), polars (blue), glys (magenta) and pros (green)", lambda func: color_polars_and_hphobs_for_active_molecule())
 
-add_simple_coot_menu_menuitem(submenu_display,
-"Color active mol by charge (+ve blue, -ve red)", lambda func: color_by_charge(active_residue()[0]))
+add_simple_coot_menu_menuitem(submenu_colour,
+"Color active mol by charge (+ve blue, -ve red)", lambda func: color_by_charge_for_active_molecule())
 
-add_simple_coot_menu_menuitem(submenu_display,
+add_simple_coot_menu_menuitem(submenu_colour,
 "Uncolor other chains in active mol", lambda func: uncolor_other_chains())
 
-add_simple_coot_menu_menuitem(submenu_display,
+add_simple_coot_menu_menuitem(submenu_colour,
 "Color active chain", lambda func: color_active_chain())
 
-add_simple_coot_menu_menuitem(submenu_display,
+add_simple_coot_menu_menuitem(submenu_colour,
 "Color active segment", lambda func: colour_active_segment())
 
-add_simple_coot_menu_menuitem(submenu_display,
-"Color by protein/nucleic acid", lambda func: color_protein_na(active_residue()[0]))
+add_simple_coot_menu_menuitem(submenu_colour,
+"Color by protein/nucleic acid", lambda func: color_protein_na_for_active_molecule())
 
 
-add_simple_coot_menu_menuitem(submenu_display,
-"Color waters", lambda func: color_waters(active_residue()[0]))
+add_simple_coot_menu_menuitem(submenu_colour,
+"Color waters", lambda func: color_waters_for_active_molecule())
 
-add_simple_coot_menu_menuitem(submenu_display, "Colour entered subset of protein residues for active mol", lambda func: color_protein_residue_subset())
+add_simple_coot_menu_menuitem(submenu_colour, "Colour entered subset of protein residues for active mol", lambda func: color_protein_residue_subset())
 
-add_simple_coot_menu_menuitem(submenu_display,
-"Color active mol by CaBLAM outliers (blue) (needs phenix)", lambda func: color_by_cablam2(active_residue()[0]))
+add_simple_coot_menu_menuitem(submenu_colour,
+"Color active mol by Ramachandran outliers", lambda func: color_by_rama_native_for_active_residue())
 
-add_simple_coot_menu_menuitem(submenu_display,
-"Color active mol by EMringer outliers (red) (needs phenix)", lambda func: color_emringer_outliers(active_residue()[0],scroll_wheel_map()))
+add_simple_coot_menu_menuitem(submenu_colour,
+"Color active mol by density fit", lambda func: color_by_density_fit_native_for_active_residue())
 
-add_simple_coot_menu_menuitem(submenu_display,
-"Color active mol by ramachandran outliers (blue) (needs phenix)", lambda func: color_by_rama(active_residue()[0]))
+add_simple_coot_menu_menuitem(submenu_colour,
+"Color active mol by NCS difference", lambda func: color_by_ncs_difference_for_active_residue())
 
-add_simple_coot_menu_menuitem(submenu_display,
-"Color active mol by map/model-CC at 4 A (Slow, needs phenix, P1 only)", lambda func: color_by_cc(active_residue()[0]))
+add_simple_coot_menu_menuitem(submenu_colour, "Highlight chain breaks in active mol", lambda func: highlight_chain_breaks())
 
-add_simple_coot_menu_menuitem(submenu_display, "Highlight chain breaks in active mol", lambda func: highlight_chain_breaks())
-
-add_simple_coot_menu_menuitem(submenu_display, "Highlight chain breaks in all mols", lambda func: highlight_all_chain_breaks())
-
-add_simple_coot_menu_menuitem(submenu_display, "Open current view in UCSF Chimera. Experimental!", lambda func: open_in_chimera())
+add_simple_coot_menu_menuitem(submenu_colour, "Highlight chain breaks in all mols", lambda func: highlight_all_chain_breaks())
 
 add_simple_coot_menu_menuitem(submenu_display, "Show local probe dots (H-bonds, VdW and baddies only)", lambda func: local_hbonds_and_baddies())
 
@@ -4103,16 +5007,12 @@ add_simple_coot_menu_menuitem(submenu_display, "Clear probe dots", lambda func: 
 
 add_simple_coot_menu_menuitem(submenu_display, "Find sequence in active chain", lambda func: find_sequence_with_entry())
 
-add_simple_coot_menu_menuitem(submenu_display, "Make stereo-wiggle GIF of current scenre (Needs ImageMagick!)", lambda func: make_rot_gif())
-
-
-
 #"Fit..."
 add_simple_coot_menu_menuitem(submenu_fit, "Fit all chains to map", 
 lambda func: rigid_fit_all_chains())
 
 add_simple_coot_menu_menuitem(submenu_fit, "Stepped sphere refine active chain",
-lambda func: stepped_sphere_refine(active_residue()[0],active_residue()[1]))
+lambda func: stepped_sphere_refine_active_chain())
 
 add_simple_coot_menu_menuitem(submenu_fit, "Fit current chain to map", 
 lambda func: rigid_fit_active_chain())
@@ -4137,7 +5037,7 @@ add_simple_coot_menu_menuitem(submenu_fit, "Fit all segments", lambda func: rigi
 add_simple_coot_menu_menuitem(submenu_fit, "Fit this segment", lambda func: fit_this_segment())
 
 add_simple_coot_menu_menuitem(submenu_fit,
-"Prosmart self restrain active mol",lambda func: run_prosmart_self())
+"Smart self restrain active mol...",lambda func: prompt_generate_smart_local_extra_restraints())
 
 add_simple_coot_menu_menuitem(submenu_fit,
 "Cylinder refine (click start and end of range)",lambda func: refine_residues_sphere_click())
@@ -4171,6 +5071,9 @@ add_simple_coot_menu_menuitem(submenu_settings,
 
 add_simple_coot_menu_menuitem(submenu_settings,
 "Set Bfac for new atoms to mean B for active mol",lambda func: set_new_atom_b_fac_to_mean())
+
+add_simple_coot_menu_menuitem(submenu_settings,
+"Set proportional editing radius",lambda func: set_proportional_editing_radius())
 
 
 #"Build..."
@@ -4247,6 +5150,12 @@ add_simple_coot_menu_menuitem(submenu_copy, "Copy active segment", lambda func: 
 add_simple_coot_menu_menuitem(submenu_copy, "Cut active segment", lambda func: cut_active_segment())
 
 add_simple_coot_menu_menuitem(submenu_copy,
+"Copy active ligand/ion/solvent", lambda func: smart_copy_active_non_polymer_residue())
+
+add_simple_coot_menu_menuitem(submenu_copy,
+"Paste copied ligand/ion/solvent", lambda func: smart_paste_copied_non_polymer_residue())
+
+add_simple_coot_menu_menuitem(submenu_copy,
 "Copy fragment (click start and end)", lambda func: copy_frag_by_click())
 
 add_simple_coot_menu_menuitem(submenu_copy,
@@ -4289,3 +5198,6 @@ add_simple_coot_menu_menuitem(submenu_maps,
 
 add_simple_coot_menu_menuitem(submenu_maps,
 "Set refinement map to scrollable map",lambda func: set_map_to_scrollable_map())
+
+add_simple_coot_menu_menuitem(submenu_maps,
+"Resample active EM map to 0.5 A/pixel",lambda func: resample_active_map_for_em_half_angstrom())
