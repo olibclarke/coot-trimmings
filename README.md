@@ -15,137 +15,213 @@ I haven't tested most of these on WinCoot, or on older versions of Coot. Most te
 
 Also, many of the functions here haven't been tested on molecules with insertion codes. If this is important to you, let me know and I'll fix.
 
-# Custom keybindings
-Ordered approximately by interestingness/usefulness. YMMV.
+## Custom menu
 
-NEW "G": Toggle display of the active map between a local mesh and a global surface.
+The script creates a `Custom` menu with these entries:
 
-NEW "L": Set contour level of scrollable map in sigma by entering a new value.
+- `Custom keybindings...`
+- `Display...`
+- `Colour...`
+- `Fit...`
+- `Renumber...`
+- `Settings...`
+- `Build...`
+- `Mutate...`
+- `Copy...`
+- `Delete...`
+- `Merge...`
+- `Maps...`
 
-NEW "Y"/"T": Cycle phi/psi angles of terminal residue. Useful when manually building in conjunction with "y"
+Some notable menu functions:
 
-"M": Mutate active residue by entered single letter code (case-insensitive).
+- `Colour...`
+  - color by rotamer outliers and missing atoms
+  - color by hydrophobic/polars
+  - color by charge
+  - color by Ramachandran outliers
+  - color by density fit
+  - color by NCS difference
+  - highlight chain breaks
+- `Fit...`
+  - fit chains and segments to map
+  - local cylinder refine
+  - smart self restraints with user-entered cutoff
+- `Settings...`
+  - auto-scale B-factor colouring
+  - set B for new atoms from active molecule mean B
+  - **set proportional editing radius** 
+- `Copy...`
+  - copy/cut chains and segments
+  - **copy active ligand/ion/solvent**
+  - **paste copied ligand/ion/solvent** 
+- `Maps...`
+  - map sharpening / blurring helpers
+  - low-pass filtered map generation
+  - resample active EM map to `0.5 A/pixel`
 
-"?": Display only active model; If only active model displayed, cycle display of models.
+## Proportional editing radius explanation
+Changing the proportional editing radius changes the "sphere of influence" when dragging during interactive dragged refinement. A larger proportional editing radius means one can drag a larger region without disturibng local geometry - e.g. think moving a domain, or adjusting the register of a helix. There is a mouse interface for this currently (Ctrl-scroll during dragged refinement) but it can be fragile on some systems. 
 
-"~": Display only active map; If only active map displayed, cycle display of maps.
+I have added a dialog (_Custom...Settings...Set Proportional Editing Radius_) to directly set this radius; However, because there is no way in the API to get the current radius, it assumes that you are not using the Ctrl-scroll method for adjusting the radius. If you are, unexpected results may ensue.
 
-"\`": Toggle display of all maps.
+## Custom keybindings
 
-"/": Toggle display of all models.
+These are the main custom shortcuts defined by the script:
 
-"]"/"[": Cycle representation mode forward/back for active model.
+### Display and navigation
 
-"}"/"{": Cycle symmetry representation mode forward/back for active model.
+| Key | Action |
+| --- | --- |
+| `G` | Toggle the active map between local mesh view and global solid view |
+| `?` | Show only the active model, or cycle displayed models |
+| `~` | Show only the active map, or cycle displayed maps |
+| `` ` `` | Toggle display of all maps |
+| `/` | Toggle display of all model molecules |
+| `[` | Cycle model representation mode |
+| `]` | Cycle model representation mode backward |
+| `{` | Cycle symmetry representation mode |
+| `}` | Cycle symmetry representation mode backward |
+| `>` | Go to next residue in the current chain |
+| `<` | Go to previous residue in the current chain |
+| `o` | Go to the next NCS-related chain |
+| `O` | Go to the NCS master chain |
+| `D` | Toggle environment distances |
+| `Z` | Clear labels and distances |
+| `v` | Undo symmetry view, only if symmetry is currently shown |
+| `Tab` | Clear pending picks |
+| `b` | Go to the nearest density peak near the current rotation centre |
 
-"R": Cycle through rotamers for active residue.
+### Map control
 
-"H": Toggle hide/display of modelling toolbar.
+| Key | Action |
+| --- | --- |
+| `!` to `(` | Set the current map to `1` to `9` sigma |
+| `=` | Increase current map contour |
+| `-` | Decrease current map contour |
+| `;` | Decrease map radius |
+| `'` | Increase map radius |
 
-"h": Place helix here, with H-bond restraints added.
+### Building and editing
 
-"Tab": Clear pending picks.
+| Key | Action |
+| --- | --- |
+| `h` | Place helix here |
+| `m` | Measure distance |
+| `w` | Place water |
+| `W` | Place water and refine |
+| `y` | Add terminal residue |
+| `Y` | Cycle terminal-residue phi |
+| `T` | Cycle terminal-residue psi |
+| `M` | Mutate active residue by one-letter code |
+| `q` | Flip peptide |
+| `X` | Delete active residue |
+| `K` | Delete active sidechain |
+| `k` | Fill partial sidechain |
+| `C` | Copy active ligand/ion/solvent |
+| `V` | Paste copied ligand/ion/solvent at the pointer |
 
-"!"..."(": Set active map contour to 1,2,3...9 sigma.
+### Refinement and fitting
 
-">"/"<": Next/previous residue.
+| Key | Action |
+| --- | --- |
+| `A` | Refine the clicked residue range |
+| `a` | Local cylinder refine around the active residue or ligand |
+| `r` | Refine triple around the active residue |
+| `J` | Jiggle-fit the active non-polymer residue |
+| `R` | Cycle rotamers for the active residue |
+| `g` | Generate smart local extra restraints for the active model |
 
-"Q": Save and overwrite active model (makes backup in case of accidents).
+### Saving and history
 
-"A": Real space refine zone (click start and end of zone)
+| Key | Action |
+| --- | --- |
+| `Q` | Save and overwrite the active model |
+| `z` | Undo |
+| `x` | Redo |
 
-"Z": Clear distances and labels.
+## Smart local extra restraints
 
-"P": Place atom at pointer.
+The `g` shortcut and the `Custom -> Fit -> Smart self restrain active mol...` menu item both generate extra Geman-McClure restraints.
 
-"q": Pepflip active residue.
+Current behavior:
 
-"a": Auto-refine zone of 10 residues centered on active residue.
+- same-chain local restraints are generated for inter-residue contacts within the chosen distance cutoff
+- residue pairs more than `10` positions apart in true chain order are excluded from the local pass
+- long-range backbone `N···O/OXT` contacts are retained
+- existing extra restraints on the active molecule are cleared first
 
-"J": Jiggle fit active residue.
+The hotkey uses a fixed cutoff of `3.7 A`.
 
-"D": Toggle display of environment distances.
+The menu item lets the user enter the cutoff explicitly.
 
-"X": Delete active residue.
+## Smart ligand copy / paste
 
-"K": Kill sidechain of active residue.
+The script includes a simple ligand/ion/solvent copy buffer.
 
-"k": Fill sidechain of active residue.
+Copy:
 
-"w": Place water without refinement.
+- works on the active non-polymer residue
+- stores a hidden copied template molecule
 
-"W": Place water with refinement.
+Paste:
 
-"y": Add terminal residue.
+- duplicates the stored template
+- translates it to the current pointer / rotation centre
+- merges it into the active model
+- supports repeated paste operations
 
-"r": Refine three residues centered on active residue.
+This is available both from hotkeys (`C` / `V`) and from `Custom -> Copy...`.
 
-"V": Undo symmetry view.
+## Colouring modes
 
-"z": Undo for active model.
+Several custom colouring modes use Coot's user-defined residue colouring.
 
-"x": Redo for active model.
+Current built-in custom colouring options include:
 
-"O": Go to equivalent residue on NCS master chain.
+- rotamer outliers and missing atoms
+- hydrophobic / polar residue classes
+- charge colouring
+- protein vs nucleic-acid colouring
+- water colouring
+- Ramachandran outliers
+- density fit
+- NCS difference
 
-"|":/"\_": Increase/decrease active map level by 0.5 sigma.
+Details:
 
-# Custom menu items
-(Very incomplete list - these are some highlights)
+- Ramachandran colouring
+  - red = outlier
+  - orange = allowed/disfavored
+- Density-fit colouring
+  - spectral colouring
+  - blue = model/map correlation `CC 1.0`
+  - red = model/map correlation `CC 0.0`
+- NCS-difference colouring
+  - spectral colouring on a fixed `0 to 2 A` scale
+  - blue = low NCS difference
+  - red = high NCS difference
+  - values above `2 A` saturate at the red end
 
-## _Display_
-* Colour by rotamer probability/missing atomsl; hydrophobics/polars; +ve/-ve charge; entered subset of residues
-* Highlight chainbreaks with dotted lines; red >50 residues, orange 15-50 residues missing, gray <15 residues missing
-* Color active segment (covalently connected polymer segment).
-* Open current view in UCSF chimera (requires chimera in PATH): Hopefully does what it says on the box, including changing view and display of maps. Useful as a starting point for making density figures.
+## EM map resampling / restyling
 
-## _Renumber_
-* Renumber active chain by current res: Adjusts sequence numbering of chain so that active residue matches entered number.
-* Renumber active segment (contiguous stretch of sequence, bounded by chain breaks) by current res: Adjusts sequence numbering of segment so that active residue matches entered number. Checks for overlapping numbering.
+The menu item:
 
-## _Settings_
-* Auto-scale B-factor coloring
-* Change default B for new residues to mean B of active model.
+- `Custom -> Maps... -> Resample active EM map to 0.5 A/pixel`
 
-## _Build_
-* Forced addition of terminal residue: adds residue, ignoring map, for when you disagree with Coot's assessment of residue placeability.
-* Rebuild backbone: Uses db_mainchain to rebuild the selected zone based on similar sequence fragments in a database of high resolution structures.
-* Make alkyl chain of length n: Makes alkyl chain and jiggle-fits to map. Useful for preliminary modelling of lipids/detergents.
-* Grow helix, grow strand etc. Grows selected helix/strand by entered number of residues assuming ideal geometry.
+does the following:
 
-## _Mutate_
-* Mutate range to ALA
-* Mutate range to UNK
-* Mutate Mets to MSE and vice-versa
-* Mutate active chain to template sequence: Mutates active chain to sequence pasted into textbox, assuming numbering the same - i.e. first residue in pasted sequence is residue 1 in numbering scheme of model. Filters non-sequence (e.g. formatting) characters from pasted sequence. Once sequence is pasted once, it is remembered after, to speed up multiple register adjustments.
+- leaves difference maps unchanged
+- reads the CCP4/MRC header to determine grid spacing
+- if the spacing is already `<= 0.5 A/pixel`, it simply restyles the current map (changes color to a default blue)
+- otherwise resamples to `0.5 A/pixel`, preserves the current contour sigma, makes the new map active, and closes the old map
 
-## _Copy_
-* Cut/copy chain, segment, selected fragment, etc.
-
-## _Delete_
-* Delete active chain
-* Delete active segment
-* Delete sidechains in range
-* Delete hydrogens in active molecule
-
-## _Merge_
-* Merge two molecules or chains by clicking.
-
-## _Maps_
-* Sharpen by entered B-factor. Absolute not relative; 0 always returns to original map. (MTZ only!)
-* Change hi-res-limit for map; creates low-pass filtered version of active map (MTZ only!)
-* Go to center of active map.
-* Set refinement map to active (scrollable) map.
-
-
-
-# Toolbar buttons
+## Toolbar buttons
 * Measure distance
 * Toggle display of symmetry copies
 * Sequence context (displays local sequence before/after active residue)
 * Accept RSR (forces acceptance of current real space refine results)
 
-# Non-default setttings
+## Non-default setttings
 
 `set_symmetry_colour(255,35,0)`
 
