@@ -72,6 +72,8 @@ Some notable menu functions:
   - map sharpening / blurring helpers
   - low-pass filtered map generation
   - resample active EM map to `0.5 A/pixel`
+- `Display...`
+  - Load molecular symmetry copies from file metadata
 
 ## Proportional editing radius explanation
 Changing the proportional editing radius changes the "sphere of influence" when dragging during interactive dragged refinement. A larger proportional editing radius means one can drag a larger region without disturibng local geometry - e.g. think moving a domain, or adjusting the register of a helix. There is a mouse interface for this currently (Ctrl-scroll during dragged refinement) but it can be fragile on some systems. 
@@ -220,6 +222,9 @@ Details:
   - spectral colouring by per-residue maximum clash overlap
   - blue = low clash
   - red = high clash  
+
+## Molecular symmetry
+Load molecular symmetry copies from file metadata reads deposited biological-assembly operators from the active model file and displays the corresponding molecular symmetry copies in Coot. For PDB files it uses REMARK 350 BIOMT; for mmCIF files it uses _pdbx_struct_oper_list together with _pdbx_struct_assembly_gen. This is useful for regenerating full symmetric assemblies from a single deposited chain or asymmetric unit.
 
 ## EM map resampling / restyling
 
