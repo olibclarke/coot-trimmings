@@ -226,6 +226,13 @@ Details:
 ## Molecular symmetry
 Load molecular symmetry copies from file metadata reads deposited biological-assembly operators from the active model file and displays the corresponding molecular symmetry copies in Coot. For PDB files it uses REMARK 350 BIOMT; for mmCIF files it uses _pdbx_struct_oper_list together with _pdbx_struct_assembly_gen. This is useful for regenerating full symmetric assemblies from a single deposited chain or asymmetric unit.
 
+if _"Load molecular symmetry copies from file metadata"_ does not find usable BIOMT / mmCIF assembly operators, it opens a manual entry prompt so you can enter a point group such as C13.
+
+It assumes:
+- symmetry center = unit-cell center
+- principal Cn axis = z
+
+
 ## EM map resampling / restyling
 
 The menu item:
