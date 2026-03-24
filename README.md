@@ -229,8 +229,9 @@ Load molecular symmetry copies from file metadata reads deposited biological-ass
 if _"Load molecular symmetry copies from file metadata"_ does not find usable BIOMT / mmCIF assembly operators, it opens a manual entry prompt so you can enter a point group such as C13.
 
 It assumes:
-- symmetry center = unit-cell center
-- principal Cn axis = z
+- Symmetry center = unit-cell center
+- Principal Cn axis = z
+- If these assumptions are incorrect it will probably generate garbage
 
 
 ## EM map resampling / restyling
