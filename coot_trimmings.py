@@ -5,6 +5,13 @@
 
 import math
 
+try:
+  import gap as _plain_gap_module
+except:
+  _plain_gap_module=None
+
+MOLECULAR_SYMMETRY_SESSION_STATE={}
+
 #****Settings****
 #Make symmetry copies a brighter color
 set_symmetry_colour(255,35,0)
@@ -21,7 +28,7 @@ set_refine_max_residues(100)
 #Sets "Backrub" rotamers as default (best at low res)
 set_rotamer_search_mode(ROTAMERSEARCHLOWRES)
 
-#Use ramachandran restraints in real space refinement
+#Keep ramachandran restraints off by default
 set_refine_ramachandran_angles(0)
 
 #Use finer map sampling
@@ -78,6 +85,38 @@ set_symmetry_size(30)
 
 #Ignore nomenclature errors
 set_nomenclature_errors_on_read("ignore")
+
+def _safe_low_density_average(imol_map, imol, chain_id, start_resno, stop_resno):
+  map_coords=[]
+  map_density=[]
+  for resno in range(start_resno, stop_resno + 1):
+    atom_ls=residue_info(imol, chain_id, resno, "")
+    if not atom_ls:
+      continue
+    for atom in atom_ls:
+      if atom[0][0] in [' N  ', ' CA ', ' CB ', ' C  ', ' O  ']:
+        map_coords.append(atom[2])
+  for [x, y, z] in map_coords:
+    map_density.append(density_at_point(imol_map, x, y, z))
+  if not map_density:
+    return 0.0
+  map_density.sort()
+  cut_off=len(map_density) // 5
+  if (cut_off <= 0):
+    cut_off=1
+  map_average=sum(map_density[0:cut_off]) / float(cut_off)
+  return map_average
+
+def _patch_gap_low_density_average():
+  if _plain_gap_module is not None:
+    _plain_gap_module.low_density_average=_safe_low_density_average
+  try:
+    fit_gap.func_globals["low_density_average"]=_safe_low_density_average
+  except:
+    pass
+  return True
+
+_patch_gap_low_density_average()
 
 #****Modules****
 add_module_cryo_em_gui()
@@ -157,11 +196,11 @@ lambda: using_active_atom(fill_partial_residue,"aa_imol","aa_chain_id","aa_res_n
 
 #place water without refinement
 add_key_binding("Add Water","w",
-lambda: place_typed_atom_at_pointer("Water"))
+lambda: place_water_in_active_molecule())
 
 #place water with refinement
 add_key_binding("Add Water +","W",
-lambda: [place_typed_atom_at_pointer("Water"),sphere_refine(),accept_moving_atoms()])
+lambda: add_water_and_refine())
 
 #add terminal residue
 add_key_binding("Add terminal residue","y",
@@ -372,6 +411,7 @@ SMART_COPY_SOURCE_CENTRE=None
 SMART_COPY_RESIDUE_NAME=None
 MAP_GLOBAL_VIEW_SETTINGS={}
 EM_GLOBAL_MAP_COLOUR=(0.23137254901960785, 0.4549019607843137, 1.0)
+MAX_EM_RESAMPLE_TARGET_VOXELS=250000000
 PROPORTIONAL_EDITING_RADIUS=1.0
 
 POLYMER_RESIDUE_NAMES=set([
@@ -404,6 +444,20 @@ def _active_molecule_or_status():
   if not residue:
     return None
   return residue[0]
+
+def _positive_int_from_entry(value, dialog_label, minimum=1):
+  try:
+    parsed=int(value)
+  except:
+    info_dialog("%s must be a whole number." % dialog_label)
+    return None
+  if parsed < minimum:
+    if minimum == 1:
+      info_dialog("%s must be at least 1." % dialog_label)
+    else:
+      info_dialog("%s must be at least %d." % (dialog_label, minimum))
+    return None
+  return parsed
 
 _NCS_MASTER_CHAIN_ID_BUILTIN=globals().get("ncs_master_chain_id")
 
@@ -517,6 +571,929 @@ def _distance_sq(point_1, point_2):
   dz=point_1[2]-point_2[2]
   return dx*dx + dy*dy + dz*dz
 
+def _normalize_vector(vector):
+  length=math.sqrt(vector[0]*vector[0] + vector[1]*vector[1] + vector[2]*vector[2])
+  if length < 0.0000001:
+    return None
+  return [vector[0]/length, vector[1]/length, vector[2]/length]
+
+def _rotation_matrix_about_axis(axis, theta):
+  normalized_axis=_normalize_vector(axis)
+  if not normalized_axis:
+    return None
+  ux=normalized_axis[0]
+  uy=normalized_axis[1]
+  uz=normalized_axis[2]
+  cos_theta=math.cos(theta)
+  sin_theta=math.sin(theta)
+  one_minus_cos=1.0-cos_theta
+  return [
+    cos_theta + ux*ux*one_minus_cos,
+    ux*uy*one_minus_cos - uz*sin_theta,
+    ux*uz*one_minus_cos + uy*sin_theta,
+    uy*ux*one_minus_cos + uz*sin_theta,
+    cos_theta + uy*uy*one_minus_cos,
+    uy*uz*one_minus_cos - ux*sin_theta,
+    uz*ux*one_minus_cos - uy*sin_theta,
+    uz*uy*one_minus_cos + ux*sin_theta,
+    cos_theta + uz*uz*one_minus_cos
+  ]
+
+def _zeroify_rotation_matrix(matrix):
+  if not matrix:
+    return None
+  zeroified=[]
+  for value in matrix:
+    if abs(value) < 0.0000001:
+      zeroified.append(0.0)
+    elif abs(value-1.0) < 0.0000001:
+      zeroified.append(1.0)
+    elif abs(value+1.0) < 0.0000001:
+      zeroified.append(-1.0)
+    elif abs(value-0.5) < 0.0000001:
+      zeroified.append(0.5)
+    elif abs(value+0.5) < 0.0000001:
+      zeroified.append(-0.5)
+    else:
+      zeroified.append(value)
+  return zeroified
+
+def _rotation_c2_xy(theta):
+  return [
+    math.cos(2.0*theta), math.sin(2.0*theta), 0.0,
+    math.sin(2.0*theta), -math.cos(2.0*theta), 0.0,
+    0.0, 0.0, -1.0
+  ]
+
+def _icosahedral_phi():
+  return 0.5*(1.0+math.sqrt(5.0))
+
+def _icosahedral_axes_c2():
+  phi=_icosahedral_phi()
+  axes=[]
+  for sign_1 in [1.0, -1.0]:
+    for sign_2 in [1.0, -1.0]:
+      axes.append([0.0, sign_1, sign_2*phi])
+      axes.append([sign_1, sign_2*phi, 0.0])
+      axes.append([sign_2*phi, 0.0, sign_1])
+  return axes
+
+def _icosahedral_axes_c3():
+  axes=[]
+  for x in [1.0, -1.0]:
+    for y in [1.0, -1.0]:
+      for z in [1.0, -1.0]:
+        axes.append([x, y, z])
+  return axes
+
+def _icosahedral_axes_c5():
+  phi=_icosahedral_phi()
+  axes=[]
+  for sign_1 in [1.0, -1.0]:
+    for sign_2 in [1.0, -1.0]:
+      axes.append([0.0, sign_1/phi, sign_2*phi])
+      axes.append([sign_1/phi, sign_2*phi, 0.0])
+      axes.append([sign_2*phi, 0.0, sign_1/phi])
+  return axes
+
+def _unique_rotation_matrices(matrices):
+  unique=[]
+  seen={}
+  for matrix in matrices:
+    zeroified=_zeroify_rotation_matrix(matrix)
+    key=tuple([round(value, 6) for value in zeroified])
+    if not seen.has_key(key):
+      seen[key]=True
+      unique.append(zeroified)
+  return unique
+
+def _generate_point_group_rotation_matrices(point_group_symbol):
+  symbol=point_group_symbol.strip().upper()
+  if not symbol:
+    return None
+
+  if symbol.startswith("C") and len(symbol) > 1 and symbol[1:].isdigit():
+    order=int(symbol[1:])
+    if order < 2:
+      return None
+    matrices=[]
+    for index in range(1, order):
+      matrices.append(_rotation_matrix_about_axis([0.0, 0.0, 1.0], (2.0*math.pi*index)/float(order)))
+    return _unique_rotation_matrices(matrices)
+
+  if symbol.startswith("D") and len(symbol) > 1 and symbol[1:].isdigit():
+    order=int(symbol[1:])
+    if order < 2:
+      return None
+    matrices=[]
+    for index in range(1, order):
+      matrices.append(_rotation_matrix_about_axis([0.0, 0.0, 1.0], (2.0*math.pi*index)/float(order)))
+    for index in range(order):
+      matrices.append(_rotation_c2_xy((math.pi*index)/float(order)))
+    return _unique_rotation_matrices(matrices)
+
+  if symbol == "T":
+    axes=[[1.0,0.0,0.0], [0.0,1.0,0.0], [0.0,0.0,1.0],
+          [1.0,1.0,1.0], [-1.0,-1.0,1.0], [1.0,-1.0,-1.0], [-1.0,1.0,-1.0]]
+    matrices=[]
+    for axis in axes[:3]:
+      matrices.append(_rotation_matrix_about_axis(axis, math.pi))
+    for axis in axes[3:]:
+      matrices.append(_rotation_matrix_about_axis(axis, 2.0*math.pi/3.0))
+      matrices.append(_rotation_matrix_about_axis(axis, 4.0*math.pi/3.0))
+    return _unique_rotation_matrices(matrices)
+
+  if symbol == "O":
+    axes_c4=[[1.0,0.0,0.0], [0.0,1.0,0.0], [0.0,0.0,1.0]]
+    axes_c3=[[1.0,1.0,1.0], [-1.0,-1.0,1.0], [1.0,-1.0,-1.0], [-1.0,1.0,-1.0]]
+    axes_c2=[[1.0,1.0,0.0], [1.0,-1.0,0.0], [1.0,0.0,1.0],
+             [1.0,0.0,-1.0], [0.0,1.0,1.0], [0.0,1.0,-1.0]]
+    matrices=[]
+    for axis in axes_c4:
+      matrices.append(_rotation_matrix_about_axis(axis, math.pi/2.0))
+      matrices.append(_rotation_matrix_about_axis(axis, math.pi))
+      matrices.append(_rotation_matrix_about_axis(axis, 3.0*math.pi/2.0))
+    for axis in axes_c3:
+      matrices.append(_rotation_matrix_about_axis(axis, 2.0*math.pi/3.0))
+      matrices.append(_rotation_matrix_about_axis(axis, 4.0*math.pi/3.0))
+    for axis in axes_c2:
+      matrices.append(_rotation_matrix_about_axis(axis, math.pi))
+    return _unique_rotation_matrices(matrices)
+
+  if symbol == "I":
+    matrices=[]
+    for axis in _icosahedral_axes_c2():
+      matrices.append(_rotation_matrix_about_axis(axis, math.pi))
+    for axis in _icosahedral_axes_c3():
+      matrices.append(_rotation_matrix_about_axis(axis, 2.0*math.pi/3.0))
+      matrices.append(_rotation_matrix_about_axis(axis, 4.0*math.pi/3.0))
+    for axis in _icosahedral_axes_c5():
+      matrices.append(_rotation_matrix_about_axis(axis, 2.0*math.pi/5.0))
+      matrices.append(_rotation_matrix_about_axis(axis, 4.0*math.pi/5.0))
+      matrices.append(_rotation_matrix_about_axis(axis, 6.0*math.pi/5.0))
+      matrices.append(_rotation_matrix_about_axis(axis, 8.0*math.pi/5.0))
+    return _unique_rotation_matrices(matrices)
+
+  return None
+
+def _strict_ncs_translation_about_origin(rotation_matrix, origin_xyz):
+  ox=origin_xyz[0]
+  oy=origin_xyz[1]
+  oz=origin_xyz[2]
+  rx=rotation_matrix[0]*ox + rotation_matrix[1]*oy + rotation_matrix[2]*oz
+  ry=rotation_matrix[3]*ox + rotation_matrix[4]*oy + rotation_matrix[5]*oz
+  rz=rotation_matrix[6]*ox + rotation_matrix[7]*oy + rotation_matrix[8]*oz
+  return [ox-rx, oy-ry, oz-rz]
+
+def _cell_centre_xyz(mol_id):
+  cell_info=cell(mol_id)
+  return [0.5*float(cell_info[0]), 0.5*float(cell_info[1]), 0.5*float(cell_info[2])]
+
+def _apply_point_group_molecular_symmetry(mol_id, point_group_symbol, origin_xyz):
+  global MOLECULAR_SYMMETRY_SESSION_STATE
+  normalized_symbol=point_group_symbol.strip().upper()
+  matrices=_generate_point_group_rotation_matrices(normalized_symbol)
+  if not matrices:
+    info_dialog("Unsupported symmetry group.\n\nSupported forms are Cn, Dn, T, O and I.\nExamples: C4, C13, D7, O, I")
+    return None
+
+  prior_state=MOLECULAR_SYMMETRY_SESSION_STATE.get(("metadata-display", mol_id))
+  if prior_state:
+    set_show_symmetry_master(1)
+    _status_message("Molecular symmetry copies already loaded")
+    return None
+
+  added_count=0
+  for rotation_matrix in matrices:
+    if _matrix_is_close_to_identity(rotation_matrix, [0.0, 0.0, 0.0]):
+      continue
+    if _add_molecular_symmetry_operator(mol_id, rotation_matrix, origin_xyz):
+      added_count=added_count+1
+  if added_count == 0:
+    info_dialog("Only the identity operator was generated for %s" % normalized_symbol)
+    return None
+  try:
+    set_show_symmetry_molecule(mol_id, 1)
+  except:
+    pass
+  set_show_symmetry_master(1)
+  session_state={
+    "file_name": molecule_name(mol_id),
+    "parser": "Manual point group about cell centre",
+    "operators_added": added_count,
+    "symbol": normalized_symbol,
+    "origin": tuple(origin_xyz)
+  }
+  MOLECULAR_SYMMETRY_SESSION_STATE[("metadata-display", mol_id)]=session_state
+  _status_message("Loaded %s molecular symmetry copies for %s" % (added_count, normalized_symbol))
+  return session_state
+
+def _manual_point_group_entry_callback_for_cell_centre(mol_id):
+  def _callback(text):
+    if not text:
+      info_dialog("Enter a symmetry group such as C4 or C13")
+      return None
+    origin_xyz=_cell_centre_xyz(mol_id)
+    return _apply_point_group_molecular_symmetry(mol_id, text, origin_xyz)
+  return _callback
+
+def _prompt_manual_point_group_about_cell_centre(mol_id):
+  generic_single_entry("No assembly operators were found.\n\nEnter a point group (e.g. C13).\nAssumption: symmetry centre at unit-cell centre,\nwith the principal Cn axis along z.",
+                       "C13",
+                       "Manual molecular symmetry",
+                       _manual_point_group_entry_callback_for_cell_centre(mol_id))
+
+def _apply_point_group_strict_ncs(mol_id, point_group_symbol):
+  global MOLECULAR_SYMMETRY_SESSION_STATE
+  normalized_symbol=point_group_symbol.strip().upper()
+  matrices=_generate_point_group_rotation_matrices(normalized_symbol)
+  if not matrices:
+    info_dialog("Unsupported symmetry group.\n\nSupported forms are Cn, Dn, T, O and I.\nExamples: C4, C16, D7, O, I")
+    return None
+
+  origin_xyz=_rotation_centre_xyz()
+  state_key=mol_id
+  prior_state=MOLECULAR_SYMMETRY_SESSION_STATE.get(state_key)
+  origin_key=(round(origin_xyz[0], 3), round(origin_xyz[1], 3), round(origin_xyz[2], 3))
+
+  if prior_state:
+    if prior_state["symbol"] == normalized_symbol and prior_state["origin"] == origin_key:
+      set_show_strict_ncs(mol_id, 1)
+      _status_message("Molecular symmetry already active for %s" % normalized_symbol)
+      return matrices
+    info_dialog("Molecular symmetry has already been activated for this molecule in this session.\n\nOld Coot does not expose a way to clear strict NCS matrices, so to change the symmetry group or origin you should reload the molecule.")
+    return None
+
+  for rotation_matrix in matrices:
+    translation=_strict_ncs_translation_about_origin(rotation_matrix, origin_xyz)
+    add_strict_ncs_matrix(mol_id, "A", "A",
+                          rotation_matrix[0], rotation_matrix[1], rotation_matrix[2],
+                          rotation_matrix[3], rotation_matrix[4], rotation_matrix[5],
+                          rotation_matrix[6], rotation_matrix[7], rotation_matrix[8],
+                          translation[0], translation[1], translation[2])
+
+  set_show_strict_ncs(mol_id, 1)
+  set_show_symmetry_master(1)
+  MOLECULAR_SYMMETRY_SESSION_STATE[state_key]={
+    "symbol": normalized_symbol,
+    "origin": origin_key,
+    "count": len(matrices)
+  }
+  _status_message("Activated %s molecular symmetry (%s operators)" % (normalized_symbol, len(matrices)))
+  return matrices
+
+def activate_molecular_symmetry_from_entry(text):
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  if not text:
+    info_dialog("Enter a symmetry group such as C4, C16, D7, O or I")
+    return None
+  return _apply_point_group_strict_ncs(residue[0], text)
+
+def prompt_activate_molecular_symmetry():
+  generic_single_entry("Point group symmetry about current rotation centre (e.g. C4, C16, D7, O, I)",
+                       "C4",
+                       "Activate molecular symmetry",
+                       activate_molecular_symmetry_from_entry)
+
+def _matrix_is_close_to_identity(rotation_matrix, translation_vector):
+  if not rotation_matrix or not translation_vector:
+    return False
+  identity=[1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0]
+  for index in range(9):
+    if abs(rotation_matrix[index]-identity[index]) > 0.00001:
+      return False
+  for value in translation_vector:
+    if abs(value) > 0.00001:
+      return False
+  return True
+
+def _active_molecule_source_file_or_status():
+  mol_id=_active_molecule_or_status()
+  if mol_id is None:
+    return None
+  file_name=molecule_name(mol_id)
+  if not file_name:
+    info_dialog("Active molecule does not have an associated file name")
+    return None
+  return (mol_id, file_name)
+
+def _parse_pdb_biomt_operators(file_name):
+  import os
+  import re
+  if not os.path.isfile(file_name):
+    return None
+  file_handle=open(file_name, "r")
+  try:
+    lines=file_handle.readlines()
+  finally:
+    file_handle.close()
+
+  current_chain_ids=None
+  operators={}
+  biomt_row_regex=re.compile(r"^REMARK 350\s+BIOMT([123])\s+(\d+)\s+([-0-9\.]+)\s+([-0-9\.]+)\s+([-0-9\.]+)\s+([-0-9\.]+)")
+
+  for raw_line in lines:
+    line=raw_line.rstrip("\n")
+    if line.startswith("REMARK 350") and ("APPLY THE FOLLOWING TO CHAINS:" in line or "AND CHAINS:" in line):
+      chain_text=line.split("CHAINS:",1)[1].strip()
+      chain_text=chain_text.replace(";", "")
+      chain_ids=[piece.strip() for piece in chain_text.split(",") if piece.strip()]
+      if not current_chain_ids:
+        current_chain_ids=[]
+      for chain_id in chain_ids:
+        if chain_id not in current_chain_ids:
+          current_chain_ids.append(chain_id)
+      continue
+    match=biomt_row_regex.match(line)
+    if not match:
+      continue
+    row_index=int(match.group(1))
+    operator_id=int(match.group(2))
+    values=[float(match.group(3)), float(match.group(4)), float(match.group(5)), float(match.group(6))]
+    if not operators.has_key(operator_id):
+      operators[operator_id]={"rows": {}, "chain_ids": list(current_chain_ids or [])}
+    if current_chain_ids:
+      operators[operator_id]["chain_ids"]=list(current_chain_ids)
+    operators[operator_id]["rows"][row_index]=values
+
+  parsed=[]
+  for operator_id in sorted(operators.keys()):
+    operator=operators[operator_id]
+    rows=operator["rows"]
+    if not (rows.has_key(1) and rows.has_key(2) and rows.has_key(3)):
+      continue
+    rotation_matrix=[
+      rows[1][0], rows[1][1], rows[1][2],
+      rows[2][0], rows[2][1], rows[2][2],
+      rows[3][0], rows[3][1], rows[3][2]
+    ]
+    translation_vector=[rows[1][3], rows[2][3], rows[3][3]]
+    parsed.append({
+      "source": "BIOMT",
+      "id": operator_id,
+      "chain_ids": operator["chain_ids"],
+      "rotation": _zeroify_rotation_matrix(rotation_matrix),
+      "translation": translation_vector
+    })
+  return parsed
+
+def _tokenize_cif_row_text(text):
+  import shlex
+  lexer=shlex.shlex(text, posix=True)
+  lexer.whitespace_split=True
+  lexer.commenters=''
+  return list(lexer)
+
+def _parse_cif_loop_rows(lines, start_index):
+  headers=[]
+  row_lines=[]
+  index=start_index
+  while index < len(lines):
+    stripped=lines[index].strip()
+    if stripped.startswith("_"):
+      headers.append(stripped)
+      index=index+1
+      continue
+    break
+  while index < len(lines):
+    stripped=lines[index].strip()
+    if not stripped:
+      index=index+1
+      continue
+    if stripped == "#":
+      index=index+1
+      break
+    if stripped.startswith("loop_") or stripped.startswith("_"):
+      break
+    row_lines.append(stripped)
+    index=index+1
+  tokens=_tokenize_cif_row_text(" ".join(row_lines))
+  if not headers:
+    return ([], [], index)
+  n_columns=len(headers)
+  rows=[]
+  current=[]
+  for token in tokens:
+    current.append(token)
+    if len(current) == n_columns:
+      rows.append(current)
+      current=[]
+  return (headers, rows, index)
+
+def _parse_cif_struct_ncs_oper_operators(file_name):
+  import os
+  if not os.path.isfile(file_name):
+    return None
+  file_handle=open(file_name, "r")
+  try:
+    lines=file_handle.readlines()
+  finally:
+    file_handle.close()
+
+  index=0
+  while index < len(lines):
+    if lines[index].strip() != "loop_":
+      index=index+1
+      continue
+    headers, rows, next_index=_parse_cif_loop_rows(lines, index+1)
+    index=next_index
+    if "_struct_ncs_oper.id" not in headers:
+      continue
+    header_index={}
+    for header_position in range(len(headers)):
+      header_index[headers[header_position]]=header_position
+    required_headers=[
+      "_struct_ncs_oper.id",
+      "_struct_ncs_oper.matrix[1][1]",
+      "_struct_ncs_oper.matrix[1][2]",
+      "_struct_ncs_oper.matrix[1][3]",
+      "_struct_ncs_oper.matrix[2][1]",
+      "_struct_ncs_oper.matrix[2][2]",
+      "_struct_ncs_oper.matrix[2][3]",
+      "_struct_ncs_oper.matrix[3][1]",
+      "_struct_ncs_oper.matrix[3][2]",
+      "_struct_ncs_oper.matrix[3][3]",
+      "_struct_ncs_oper.vector[1]",
+      "_struct_ncs_oper.vector[2]",
+      "_struct_ncs_oper.vector[3]"
+    ]
+    missing_required=[header for header in required_headers if not header_index.has_key(header)]
+    if missing_required:
+      return None
+    parsed=[]
+    for row in rows:
+      rotation_matrix=[
+        float(row[header_index["_struct_ncs_oper.matrix[1][1]"]]),
+        float(row[header_index["_struct_ncs_oper.matrix[1][2]"]]),
+        float(row[header_index["_struct_ncs_oper.matrix[1][3]"]]),
+        float(row[header_index["_struct_ncs_oper.matrix[2][1]"]]),
+        float(row[header_index["_struct_ncs_oper.matrix[2][2]"]]),
+        float(row[header_index["_struct_ncs_oper.matrix[2][3]"]]),
+        float(row[header_index["_struct_ncs_oper.matrix[3][1]"]]),
+        float(row[header_index["_struct_ncs_oper.matrix[3][2]"]]),
+        float(row[header_index["_struct_ncs_oper.matrix[3][3]"]])
+      ]
+      translation_vector=[
+        float(row[header_index["_struct_ncs_oper.vector[1]"]]),
+        float(row[header_index["_struct_ncs_oper.vector[2]"]]),
+        float(row[header_index["_struct_ncs_oper.vector[3]"]])
+      ]
+      parsed.append({
+        "source": "_struct_ncs_oper",
+        "id": row[header_index["_struct_ncs_oper.id"]],
+        "rotation": _zeroify_rotation_matrix(rotation_matrix),
+        "translation": translation_vector
+      })
+    return parsed
+  return None
+
+def _parse_cif_pdbx_struct_oper_list(file_name):
+  import os
+  if not os.path.isfile(file_name):
+    return None
+  file_handle=open(file_name, "r")
+  try:
+    lines=file_handle.readlines()
+  finally:
+    file_handle.close()
+
+  index=0
+  while index < len(lines):
+    if lines[index].strip() != "loop_":
+      index=index+1
+      continue
+    headers, rows, next_index=_parse_cif_loop_rows(lines, index+1)
+    index=next_index
+    if "_pdbx_struct_oper_list.id" not in headers:
+      continue
+    header_index={}
+    for header_position in range(len(headers)):
+      header_index[headers[header_position]]=header_position
+    required_headers=[
+      "_pdbx_struct_oper_list.id",
+      "_pdbx_struct_oper_list.matrix[1][1]",
+      "_pdbx_struct_oper_list.matrix[1][2]",
+      "_pdbx_struct_oper_list.matrix[1][3]",
+      "_pdbx_struct_oper_list.matrix[2][1]",
+      "_pdbx_struct_oper_list.matrix[2][2]",
+      "_pdbx_struct_oper_list.matrix[2][3]",
+      "_pdbx_struct_oper_list.matrix[3][1]",
+      "_pdbx_struct_oper_list.matrix[3][2]",
+      "_pdbx_struct_oper_list.matrix[3][3]",
+      "_pdbx_struct_oper_list.vector[1]",
+      "_pdbx_struct_oper_list.vector[2]",
+      "_pdbx_struct_oper_list.vector[3]"
+    ]
+    missing_required=[header for header in required_headers if not header_index.has_key(header)]
+    if missing_required:
+      return None
+    parsed={}
+    for row in rows:
+      parsed[row[header_index["_pdbx_struct_oper_list.id"]]]={
+        "source": "_pdbx_struct_oper_list",
+        "id": row[header_index["_pdbx_struct_oper_list.id"]],
+        "rotation": _zeroify_rotation_matrix([
+          float(row[header_index["_pdbx_struct_oper_list.matrix[1][1]"]]),
+          float(row[header_index["_pdbx_struct_oper_list.matrix[1][2]"]]),
+          float(row[header_index["_pdbx_struct_oper_list.matrix[1][3]"]]),
+          float(row[header_index["_pdbx_struct_oper_list.matrix[2][1]"]]),
+          float(row[header_index["_pdbx_struct_oper_list.matrix[2][2]"]]),
+          float(row[header_index["_pdbx_struct_oper_list.matrix[2][3]"]]),
+          float(row[header_index["_pdbx_struct_oper_list.matrix[3][1]"]]),
+          float(row[header_index["_pdbx_struct_oper_list.matrix[3][2]"]]),
+          float(row[header_index["_pdbx_struct_oper_list.matrix[3][3]"]])
+        ]),
+        "translation": [
+          float(row[header_index["_pdbx_struct_oper_list.vector[1]"]]),
+          float(row[header_index["_pdbx_struct_oper_list.vector[2]"]]),
+          float(row[header_index["_pdbx_struct_oper_list.vector[3]"]])
+        ]
+      }
+    return parsed
+  return None
+
+def _parse_cif_pdbx_struct_assembly_gen_rows(file_name):
+  import os
+  if not os.path.isfile(file_name):
+    return None
+  file_handle=open(file_name, "r")
+  try:
+    lines=file_handle.readlines()
+  finally:
+    file_handle.close()
+
+  index=0
+  while index < len(lines):
+    if lines[index].strip() != "loop_":
+      index=index+1
+      continue
+    headers, rows, next_index=_parse_cif_loop_rows(lines, index+1)
+    index=next_index
+    if "_pdbx_struct_assembly_gen.assembly_id" not in headers:
+      continue
+    header_index={}
+    for header_position in range(len(headers)):
+      header_index[headers[header_position]]=header_position
+    required_headers=[
+      "_pdbx_struct_assembly_gen.assembly_id",
+      "_pdbx_struct_assembly_gen.oper_expression",
+      "_pdbx_struct_assembly_gen.asym_id_list"
+    ]
+    missing_required=[header for header in required_headers if not header_index.has_key(header)]
+    if missing_required:
+      return None
+    parsed=[]
+    for row in rows:
+      parsed.append({
+        "assembly_id": row[header_index["_pdbx_struct_assembly_gen.assembly_id"]],
+        "oper_expression": row[header_index["_pdbx_struct_assembly_gen.oper_expression"]],
+        "asym_id_list": row[header_index["_pdbx_struct_assembly_gen.asym_id_list"]]
+      })
+    return parsed
+
+  simple_values={}
+  for raw_line in lines:
+    stripped=raw_line.strip()
+    if not stripped.startswith("_pdbx_struct_assembly_gen."):
+      continue
+    pieces=stripped.split(None, 1)
+    if len(pieces) < 2:
+      continue
+    simple_values[pieces[0]]=pieces[1]
+  if simple_values.has_key("_pdbx_struct_assembly_gen.assembly_id") and \
+     simple_values.has_key("_pdbx_struct_assembly_gen.oper_expression") and \
+     simple_values.has_key("_pdbx_struct_assembly_gen.asym_id_list"):
+    return [{
+      "assembly_id": simple_values["_pdbx_struct_assembly_gen.assembly_id"],
+      "oper_expression": simple_values["_pdbx_struct_assembly_gen.oper_expression"],
+      "asym_id_list": simple_values["_pdbx_struct_assembly_gen.asym_id_list"]
+    }]
+  return None
+
+def _expand_operator_token_list(expression_text):
+  tokens=[]
+  for piece in expression_text.split(","):
+    token=piece.strip()
+    if not token or token == "?":
+      continue
+    if "-" in token:
+      range_parts=token.split("-", 1)
+      try:
+        start_value=int(range_parts[0])
+        end_value=int(range_parts[1])
+      except:
+        tokens.append(token)
+        continue
+      step=1
+      if end_value < start_value:
+        step=-1
+      for value in range(start_value, end_value+step, step):
+        tokens.append(str(value))
+    else:
+      tokens.append(token)
+  return tokens
+
+def _expand_cif_oper_expression(oper_expression):
+  import re
+  if not oper_expression:
+    return []
+  expression=oper_expression.replace(" ", "")
+  grouped_parts=re.findall(r"\(([^()]*)\)", expression)
+  if not grouped_parts:
+    grouped_parts=[expression]
+  expanded_groups=[_expand_operator_token_list(group_text) for group_text in grouped_parts]
+  if not expanded_groups:
+    return []
+  sequences=[[]]
+  for group_tokens in expanded_groups:
+    new_sequences=[]
+    for sequence in sequences:
+      for token in group_tokens:
+        new_sequences.append(sequence+[token])
+    sequences=new_sequences
+  return sequences
+
+def _matrix_multiply_3x3(left_matrix, right_matrix):
+  return [
+    left_matrix[0]*right_matrix[0] + left_matrix[1]*right_matrix[3] + left_matrix[2]*right_matrix[6],
+    left_matrix[0]*right_matrix[1] + left_matrix[1]*right_matrix[4] + left_matrix[2]*right_matrix[7],
+    left_matrix[0]*right_matrix[2] + left_matrix[1]*right_matrix[5] + left_matrix[2]*right_matrix[8],
+    left_matrix[3]*right_matrix[0] + left_matrix[4]*right_matrix[3] + left_matrix[5]*right_matrix[6],
+    left_matrix[3]*right_matrix[1] + left_matrix[4]*right_matrix[4] + left_matrix[5]*right_matrix[7],
+    left_matrix[3]*right_matrix[2] + left_matrix[4]*right_matrix[5] + left_matrix[5]*right_matrix[8],
+    left_matrix[6]*right_matrix[0] + left_matrix[7]*right_matrix[3] + left_matrix[8]*right_matrix[6],
+    left_matrix[6]*right_matrix[1] + left_matrix[7]*right_matrix[4] + left_matrix[8]*right_matrix[7],
+    left_matrix[6]*right_matrix[2] + left_matrix[7]*right_matrix[5] + left_matrix[8]*right_matrix[8]
+  ]
+
+def _compose_affine_operator_sequence(operator_ids, operator_lookup):
+  rotation_matrix=[1.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,1.0]
+  translation_vector=[0.0,0.0,0.0]
+  for operator_id in operator_ids:
+    if not operator_lookup.has_key(operator_id):
+      return None
+    operator=operator_lookup[operator_id]
+    rotation_matrix=_matrix_multiply_3x3(operator["rotation"], rotation_matrix)
+    rotated_translation=_matrix_vector_product_3x3(operator["rotation"], translation_vector)
+    translation_vector=[
+      rotated_translation[0]+operator["translation"][0],
+      rotated_translation[1]+operator["translation"][1],
+      rotated_translation[2]+operator["translation"][2]
+    ]
+  return {
+    "source": "_pdbx_struct_assembly_gen",
+    "id": ",".join(operator_ids),
+    "rotation": _zeroify_rotation_matrix(rotation_matrix),
+    "translation": translation_vector
+  }
+
+def _parse_cif_assembly_operators(file_name, target_chain_ids):
+  assembly_rows=_parse_cif_pdbx_struct_assembly_gen_rows(file_name)
+  operator_lookup=_parse_cif_pdbx_struct_oper_list(file_name)
+  if not assembly_rows or not operator_lookup:
+    return None
+
+  matching_rows=[]
+  matching_assembly_id=None
+  for row in assembly_rows:
+    row_chain_ids=[piece.strip() for piece in row["asym_id_list"].split(",") if piece.strip()]
+    if target_chain_ids and not [chain_id for chain_id in target_chain_ids if chain_id in row_chain_ids]:
+      continue
+    if matching_assembly_id is None:
+      matching_assembly_id=row["assembly_id"]
+    if row["assembly_id"] == matching_assembly_id:
+      matching_rows.append(row)
+  if not matching_rows:
+    matching_assembly_id=assembly_rows[0]["assembly_id"]
+    matching_rows=[row for row in assembly_rows if row["assembly_id"] == matching_assembly_id]
+
+  parsed=[]
+  seen_ids={}
+  for row in matching_rows:
+    operator_sequences=_expand_cif_oper_expression(row["oper_expression"])
+    for operator_ids in operator_sequences:
+      composed_operator=_compose_affine_operator_sequence(operator_ids, operator_lookup)
+      if not composed_operator:
+        continue
+      if seen_ids.has_key(composed_operator["id"]):
+        continue
+      seen_ids[composed_operator["id"]]=True
+      parsed.append(composed_operator)
+  return parsed
+
+def _molecule_chain_ids_for_symmetry(mol_id):
+  try:
+    chains=chain_ids(mol_id)
+  except:
+    chains=[]
+  if not chains:
+    residue=_active_residue_or_status()
+    if residue and residue[0] == mol_id:
+      return [residue[1]]
+  return chains
+
+def _active_chain_id_for_symmetry_source(mol_id):
+  residue=_active_residue_or_status()
+  if residue and residue[0] == mol_id:
+    return residue[1]
+  chains=_molecule_chain_ids_for_symmetry(mol_id)
+  if len(chains) == 1:
+    return chains[0]
+  return None
+
+def _matrix_vector_product_3x3(rotation_matrix, vector):
+  return [
+    rotation_matrix[0]*vector[0] + rotation_matrix[1]*vector[1] + rotation_matrix[2]*vector[2],
+    rotation_matrix[3]*vector[0] + rotation_matrix[4]*vector[1] + rotation_matrix[5]*vector[2],
+    rotation_matrix[6]*vector[0] + rotation_matrix[7]*vector[1] + rotation_matrix[8]*vector[2]
+  ]
+
+def _rotation_axis_from_matrix(rotation_matrix):
+  axis=[
+    rotation_matrix[7]-rotation_matrix[5],
+    rotation_matrix[2]-rotation_matrix[6],
+    rotation_matrix[3]-rotation_matrix[1]
+  ]
+  axis_length=math.sqrt(_distance_sq(axis, [0.0, 0.0, 0.0]))
+  if axis_length > 0.000001:
+    return [component/axis_length for component in axis]
+  rows=[
+    [rotation_matrix[0]+1.0, rotation_matrix[1], rotation_matrix[2]],
+    [rotation_matrix[3], rotation_matrix[4]+1.0, rotation_matrix[5]],
+    [rotation_matrix[6], rotation_matrix[7], rotation_matrix[8]+1.0]
+  ]
+  best_row=None
+  best_norm=0.0
+  for row in rows:
+    row_norm=math.sqrt(_distance_sq(row, [0.0, 0.0, 0.0]))
+    if row_norm > best_norm:
+      best_row=row
+      best_norm=row_norm
+  if best_row and best_norm > 0.000001:
+    return [component/best_norm for component in best_row]
+  return [0.0, 0.0, 1.0]
+
+def _solve_3x3_linear_system(matrix_3x3, rhs_vector):
+  augmented=[
+    [float(matrix_3x3[0][0]), float(matrix_3x3[0][1]), float(matrix_3x3[0][2]), float(rhs_vector[0])],
+    [float(matrix_3x3[1][0]), float(matrix_3x3[1][1]), float(matrix_3x3[1][2]), float(rhs_vector[1])],
+    [float(matrix_3x3[2][0]), float(matrix_3x3[2][1]), float(matrix_3x3[2][2]), float(rhs_vector[2])]
+  ]
+  for pivot_index in range(3):
+    best_row=pivot_index
+    best_value=abs(augmented[pivot_index][pivot_index])
+    for row_index in range(pivot_index+1, 3):
+      value=abs(augmented[row_index][pivot_index])
+      if value > best_value:
+        best_row=row_index
+        best_value=value
+    if best_value < 0.00000001:
+      return None
+    if best_row != pivot_index:
+      augmented[pivot_index], augmented[best_row]=augmented[best_row], augmented[pivot_index]
+    pivot_value=augmented[pivot_index][pivot_index]
+    for column_index in range(pivot_index, 4):
+      augmented[pivot_index][column_index]=augmented[pivot_index][column_index]/pivot_value
+    for row_index in range(3):
+      if row_index == pivot_index:
+        continue
+      scale=augmented[row_index][pivot_index]
+      if abs(scale) < 0.00000001:
+        continue
+      for column_index in range(pivot_index, 4):
+        augmented[row_index][column_index]=augmented[row_index][column_index]-scale*augmented[pivot_index][column_index]
+  return [augmented[0][3], augmented[1][3], augmented[2][3]]
+
+def _origin_from_rotation_and_translation(rotation_matrix, translation_vector):
+  axis=_rotation_axis_from_matrix(rotation_matrix)
+  affine_rows=[
+    [1.0-rotation_matrix[0],   -rotation_matrix[1],   -rotation_matrix[2]],
+    [  -rotation_matrix[3], 1.0-rotation_matrix[4],   -rotation_matrix[5]],
+    [  -rotation_matrix[6],   -rotation_matrix[7], 1.0-rotation_matrix[8]]
+  ]
+  affine_rhs=[translation_vector[0], translation_vector[1], translation_vector[2]]
+  origin_vector=None
+  for row_pair in ((0,1), (0,2), (1,2)):
+    system_matrix=[
+      affine_rows[row_pair[0]],
+      affine_rows[row_pair[1]],
+      [axis[0], axis[1], axis[2]]
+    ]
+    system_rhs=[affine_rhs[row_pair[0]], affine_rhs[row_pair[1]], 0.0]
+    trial_origin=_solve_3x3_linear_system(system_matrix, system_rhs)
+    if trial_origin is None:
+      continue
+    origin_vector=trial_origin
+    break
+  if origin_vector is None:
+    return None
+  residual_matrix=[
+    1.0-rotation_matrix[0],   -rotation_matrix[1],   -rotation_matrix[2],
+      -rotation_matrix[3], 1.0-rotation_matrix[4],   -rotation_matrix[5],
+      -rotation_matrix[6],   -rotation_matrix[7], 1.0-rotation_matrix[8]
+  ]
+  predicted_translation=_matrix_vector_product_3x3(residual_matrix, origin_vector)
+  residual=[
+    predicted_translation[0]-translation_vector[0],
+    predicted_translation[1]-translation_vector[1],
+    predicted_translation[2]-translation_vector[2]
+  ]
+  if math.sqrt(_distance_sq(residual, [0.0, 0.0, 0.0])) > 0.01:
+    return None
+  return origin_vector
+
+def _add_molecular_symmetry_operator(mol_id, rotation_matrix, origin_vector):
+  try:
+    add_molecular_symmetry(mol_id,
+                           rotation_matrix[0], rotation_matrix[1], rotation_matrix[2],
+                           rotation_matrix[3], rotation_matrix[4], rotation_matrix[5],
+                           rotation_matrix[6], rotation_matrix[7], rotation_matrix[8],
+                           origin_vector[0], origin_vector[1], origin_vector[2])
+    return True
+  except NameError:
+    pass
+  try:
+    import _coot
+    _coot.add_molecular_symmetry(mol_id,
+                                 rotation_matrix[0], rotation_matrix[1], rotation_matrix[2],
+                                 rotation_matrix[3], rotation_matrix[4], rotation_matrix[5],
+                                 rotation_matrix[6], rotation_matrix[7], rotation_matrix[8],
+                                 origin_vector[0], origin_vector[1], origin_vector[2])
+    return True
+  except:
+    return False
+
+def _load_display_molecular_symmetry_from_metadata():
+  global MOLECULAR_SYMMETRY_SESSION_STATE
+  active_info=_active_molecule_source_file_or_status()
+  if not active_info:
+    return None
+  mol_id=active_info[0]
+  file_name=active_info[1]
+  lower_name=file_name.lower()
+
+  prior_state=MOLECULAR_SYMMETRY_SESSION_STATE.get(("metadata-display", mol_id))
+  if prior_state:
+    set_show_symmetry_master(1)
+    _status_message("Molecular symmetry copies already loaded")
+    return prior_state
+
+  if lower_name.endswith(".pdb") or lower_name.endswith(".ent"):
+    operators=_parse_pdb_biomt_operators(file_name)
+    parser_name="PDB BIOMT"
+  elif lower_name.endswith(".cif") or lower_name.endswith(".mmcif"):
+    target_chain_ids=_molecule_chain_ids_for_symmetry(mol_id)
+    operators=_parse_cif_assembly_operators(file_name, target_chain_ids)
+    parser_name="mmCIF assembly metadata"
+    if not operators:
+      operators=_parse_cif_struct_ncs_oper_operators(file_name)
+      parser_name="mmCIF _struct_ncs_oper"
+  else:
+    info_dialog("Only PDB and mmCIF files are currently supported for molecular symmetry loading")
+    return None
+
+  if not operators:
+    _prompt_manual_point_group_about_cell_centre(mol_id)
+    return None
+
+  target_chain_ids=_molecule_chain_ids_for_symmetry(mol_id)
+  if not target_chain_ids:
+    info_dialog("Could not determine chain IDs for the active molecule")
+    return None
+
+  added_count=0
+  for operator in operators:
+    rotation_matrix=operator["rotation"]
+    translation_vector=operator["translation"]
+    if _matrix_is_close_to_identity(rotation_matrix, translation_vector):
+      continue
+    if operator.get("source") == "BIOMT" or operator.get("source") == "_pdbx_struct_assembly_gen":
+      origin_vector=_origin_from_rotation_and_translation(rotation_matrix, translation_vector)
+      if origin_vector is not None:
+        if _add_molecular_symmetry_operator(mol_id, rotation_matrix, origin_vector):
+          added_count=added_count+1
+          continue
+
+  if added_count == 0:
+    info_dialog("Only identity symmetry operators were found for the active molecule")
+    return None
+
+  try:
+    set_show_symmetry_molecule(mol_id, 1)
+  except:
+    pass
+  set_show_symmetry_master(1)
+  session_state={
+    "file_name": file_name,
+    "parser": parser_name,
+    "operators_added": added_count
+  }
+  MOLECULAR_SYMMETRY_SESSION_STATE[("metadata-display", mol_id)]=session_state
+  _status_message("Loaded %s molecular symmetry operators from %s" % (added_count, parser_name))
+  return session_state
+
 def decrease_map_radius_with_status():
   current_radius=get_map_radius()
   new_radius=current_radius-2.0
@@ -577,7 +1554,7 @@ def color_waters_for_active_molecule():
     return None
   return color_waters(mol_id)
 
-def _read_ccp4_mrc_grid_spacing(file_name):
+def _read_ccp4_mrc_grid_info(file_name):
   import os
   import struct
   if not file_name or not os.path.isfile(file_name):
@@ -603,11 +1580,21 @@ def _read_ccp4_mrc_grid_spacing(file_name):
     ylen=floats[1]
     zlen=floats[2]
     if mx > 0 and my > 0 and mz > 0 and xlen > 0.0 and ylen > 0.0 and zlen > 0.0:
-      parsed=(xlen/float(mx), ylen/float(my), zlen/float(mz))
+      parsed={
+        "spacing_xyz": (xlen/float(mx), ylen/float(my), zlen/float(mz)),
+        "grid_xyz": (mx, my, mz),
+        "cell_xyz": (xlen, ylen, zlen)
+      }
       break
   if not parsed:
     return None
-  return min(parsed)
+  return parsed
+
+def _read_ccp4_mrc_grid_spacing(file_name):
+  grid_info=_read_ccp4_mrc_grid_info(file_name)
+  if not grid_info:
+    return None
+  return min(grid_info["spacing_xyz"])
 
 def _restyle_em_map_mesh(map_id, contour_sigma):
   if map_is_difference_map(map_id)!=0:
@@ -616,6 +1603,33 @@ def _restyle_em_map_mesh(map_id, contour_sigma):
   set_draw_map_standard_lines(map_id,1)
   set_map_colour(map_id,EM_GLOBAL_MAP_COLOUR[0],EM_GLOBAL_MAP_COLOUR[1],EM_GLOBAL_MAP_COLOUR[2])
   set_contour_level_in_sigma(map_id, contour_sigma)
+
+def place_water_in_active_molecule():
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  mol_id=residue[0]
+  try:
+    set_pointer_atom_molecule(mol_id)
+  except:
+    pass
+  try:
+    set_go_to_atom_molecule(mol_id)
+  except:
+    pass
+  place_typed_atom_at_pointer("Water")
+  return mol_id
+
+def add_water_and_refine():
+  mol_id=place_water_in_active_molecule()
+  if mol_id is None:
+    return None
+  if imol_refinement_map()==-1:
+    _status_message("Water added; no refinement map set")
+    return None
+  sphere_refine()
+  accept_moving_atoms()
+  return mol_id
 
 def resample_active_map_for_em_half_angstrom():
   map_id=_scrollable_map_or_status()
@@ -626,7 +1640,11 @@ def resample_active_map_for_em_half_angstrom():
     return None
   contour_sigma=get_contour_level_in_sigma(map_id)
   map_file_name=molecule_name(map_id)
-  grid_spacing=_read_ccp4_mrc_grid_spacing(map_file_name)
+  grid_info=_read_ccp4_mrc_grid_info(map_file_name)
+  if grid_info:
+    grid_spacing=min(grid_info["spacing_xyz"])
+  else:
+    grid_spacing=None
   if grid_spacing is None:
     _restyle_em_map_mesh(map_id, contour_sigma)
     _status_message("Grid spacing could not be determined; restyled active map")
@@ -636,6 +1654,19 @@ def resample_active_map_for_em_half_angstrom():
     _status_message("Map already finer than 0.5 A/pixel; restyled active map")
     return map_id
   resample_factor=grid_spacing/0.5
+  if grid_info:
+    current_grid=grid_info["grid_xyz"]
+    target_grid=[
+      int(math.ceil(current_grid[0]*resample_factor)),
+      int(math.ceil(current_grid[1]*resample_factor)),
+      int(math.ceil(current_grid[2]*resample_factor))
+    ]
+    target_voxels=target_grid[0]*target_grid[1]*target_grid[2]
+    if target_voxels > MAX_EM_RESAMPLE_TARGET_VOXELS:
+      _restyle_em_map_mesh(map_id, contour_sigma)
+      info_dialog("Refusing to resample this map to 0.5 A/pixel\nbecause the target grid would be too large.\n\nTarget grid: %d x %d x %d\nTarget size: %.1f million voxels\n\nThe active map has been restyled instead.\nIncrease MAX_EM_RESAMPLE_TARGET_VOXELS in the script\nif you really want to allow this." % (target_grid[0], target_grid[1], target_grid[2], target_voxels/1000000.0))
+      _status_message("Target resampled map too large; restyled active map")
+      return None
   old_refinement_map=(imol_refinement_map()==map_id)
   try:
     new_map_id=sharpen_blur_map_with_resampling(map_id, 0.0, resample_factor)
@@ -681,6 +1712,41 @@ def _set_smart_copy_template(imol):
     set_mol_active(imol,0)
   except:
     pass
+
+def _ensure_non_polymer_restraints_loaded_from_molecule(source_imol):
+  if source_imol not in model_molecule_list():
+    return False
+  transferred_any=False
+  seen_comp_ids={}
+  for residue_spec in all_residues_sans_water(source_imol) or []:
+    chain_id=residue_spec_to_chain_id(residue_spec)
+    resno=residue_spec_to_res_no(residue_spec)
+    ins_code=residue_spec_to_ins_code(residue_spec)
+    if chain_id is False or resno is False or ins_code is False:
+      continue
+    if _residue_is_polymer(source_imol, chain_id, resno, ins_code):
+      continue
+    comp_id=residue_name(source_imol, chain_id, resno, ins_code)
+    if not comp_id or comp_id in seen_comp_ids:
+      continue
+    seen_comp_ids[comp_id]=True
+    try:
+      restraints=monomer_restraints_for_molecule_py(comp_id, source_imol)
+    except:
+      restraints=False
+    if isinstance(restraints, dict):
+      try:
+        set_monomer_restraints_py(comp_id, restraints)
+        transferred_any=True
+        continue
+      except:
+        pass
+    try:
+      add_dictionary_from_residue(source_imol, chain_id, resno, ins_code)
+      transferred_any=True
+    except:
+      pass
+  return transferred_any
 
 def _smart_copy_atom_selection(chain_id, resno, ins_code):
   if ins_code:
@@ -818,6 +1884,7 @@ def smart_paste_copied_non_polymer_residue():
   dy=pointer_position[1]-SMART_COPY_SOURCE_CENTRE[1]
   dz=pointer_position[2]-SMART_COPY_SOURCE_CENTRE[2]
   try:
+    _ensure_non_polymer_restraints_loaded_from_molecule(SMART_COPY_TEMPLATE_IMOL)
     translate_molecule_by(paste_imol, dx, dy, dz)
     merge_molecules([paste_imol], target_mol_id)
   finally:
@@ -830,29 +1897,45 @@ def go_to_nearest_density_peak():
   if map_id is None:
     return None
   centre=_rotation_centre_xyz()
-  sigma=get_contour_level_in_sigma(map_id)
-  peak_list=map_peaks_near_point_py(map_id, sigma, centre[0], centre[1], centre[2], 8.0)
-  if not peak_list:
-    _status_message("No nearby density peak above current contour")
-    return None
-  nearest_peak=None
-  nearest_peak_distance_sq=None
-  for peak in peak_list:
-    if not isinstance(peak, (list, tuple)) or len(peak) < 3:
-      continue
+  def density_here(point):
     try:
-      peak_xyz=[float(peak[0]), float(peak[1]), float(peak[2])]
+      return density_at_point(map_id, point[0], point[1], point[2])
     except:
-      continue
-    distance_sq=_distance_sq(peak_xyz, centre)
-    if nearest_peak is None or distance_sq < nearest_peak_distance_sq:
-      nearest_peak=peak_xyz
-      nearest_peak_distance_sq=distance_sq
-  if nearest_peak is None:
-    _status_message("No nearby density peak above current contour")
+      return None
+
+  peak_point=[centre[0], centre[1], centre[2]]
+  peak_density=density_here(peak_point)
+  if peak_density is None:
+    _status_message("Unable to evaluate map density at the current position")
     return None
-  set_rotation_centre(nearest_peak[0], nearest_peak[1], nearest_peak[2])
-  return nearest_peak
+
+  for step_size in [0.5, 0.25, 0.1, 0.05]:
+    for step_index in range(40):
+      best_point=peak_point
+      best_density=peak_density
+      for dx in [-step_size, 0.0, step_size]:
+        for dy in [-step_size, 0.0, step_size]:
+          for dz in [-step_size, 0.0, step_size]:
+            if dx==0.0 and dy==0.0 and dz==0.0:
+              continue
+            trial_point=[peak_point[0]+dx, peak_point[1]+dy, peak_point[2]+dz]
+            trial_density=density_here(trial_point)
+            if trial_density is None:
+              continue
+            if trial_density > best_density:
+              best_point=trial_point
+              best_density=trial_density
+      if best_point == peak_point:
+        break
+      peak_point=best_point
+      peak_density=best_density
+
+  if _distance_sq(peak_point, centre) > 4.0*4.0:
+    _status_message("No nearby density peak within 4 A")
+    return None
+
+  set_rotation_centre(peak_point[0], peak_point[1], peak_point[2])
+  return peak_point
 
 def _parsed_atom_record(atom):
   position=residue_atom_to_position(atom)
@@ -1141,6 +2224,11 @@ def set_proportional_editing_radius():
 
 def display_only_active_map():
   active_map=scroll_wheel_map()
+  displayed_maps=[map_id for map_id in map_molecule_list() if map_is_displayed(map_id)]
+  if len(displayed_maps)==1 and active_map!=displayed_maps[0]:
+    set_scroll_wheel_map(displayed_maps[0])
+    set_scrollable_map(displayed_maps[0])
+    return None
   if not scroll_wheel_map() in map_molecule_list():
     for map_id in map_molecule_list():
       if (map_is_displayed(map_id)==1) and (map_id!=active_map):
@@ -1174,32 +2262,62 @@ def display_only_active_map():
       set_scrollable_map(map_id)
       set_scroll_wheel_map(map_id) #New
 
+def _ensure_single_displayed_map_is_scrollable():
+  displayed_maps=[map_id for map_id in map_molecule_list() if map_is_displayed(map_id)]
+  if len(displayed_maps) == 1:
+    set_scroll_wheel_map(displayed_maps[0])
+    set_scrollable_map(displayed_maps[0])
+    return displayed_maps[0]
+  return None
+
 def hide_active_mol():
-  mol_id=active_residue()[0]
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  mol_id=residue[0]
   set_mol_displayed(mol_id,0)
 
 def display_only_active():
-  try:
-    mol_id_active=active_residue()[0]
-  except:
-    mol_id_active=model_molecule_list()[0]
-  displayed_mols_count=0
-  for mol_id in model_molecule_list():
-    displayed_mols_count=displayed_mols_count+mol_is_displayed(mol_id)
-    if (mol_is_displayed(mol_id)==1) and (mol_id!=mol_id_active):
-      set_mol_displayed(mol_id,0)
-    elif (mol_is_displayed(mol_id)==0) and (mol_id==mol_id_active):
-      set_mol_displayed(mol_id,1)
-    if mol_is_displayed(mol_id):
-      displayed_mol=mol_id
+  models=model_molecule_list()
+  if not models:
+    return None
+
+  residue=_active_residue_or_status()
+  if residue:
+    mol_id_active=residue[0]
+  else:
+    try:
+      mol_id_active=go_to_atom_molecule_number()
+    except:
+      mol_id_active=-1
+    if mol_id_active not in models:
+      displayed_models=[mol_id for mol_id in models if mol_is_displayed(mol_id)]
+      if displayed_models:
+        mol_id_active=displayed_models[0]
+      else:
+        mol_id_active=models[0]
+
+  displayed_models=[mol_id for mol_id in models if mol_is_displayed(mol_id)]
+  displayed_mols_count=len(displayed_models)
+
   if displayed_mols_count==1:
-    index_displayed=model_molecule_list().index(mol_id_active)
-    try: 
-      next_mol=model_molecule_list()[index_displayed+1]
+    displayed_mol=displayed_models[0]
+    index_displayed=models.index(displayed_mol)
+    try:
+      next_mol=models[index_displayed+1]
     except IndexError:
-      next_mol=model_molecule_list()[0]
+      next_mol=models[0]
     set_mol_displayed(displayed_mol,0)
     set_mol_displayed(next_mol,1)
+    return None
+
+  for mol_id in models:
+    if mol_id == mol_id_active:
+      if mol_is_displayed(mol_id)==0:
+        set_mol_displayed(mol_id,1)
+    else:
+      if mol_is_displayed(mol_id)==1:
+        set_mol_displayed(mol_id,0)
 
 #def user_defined_add_3_10_helix_restraints():
 #  def make_restr(*args):
@@ -1421,6 +2539,7 @@ def toggle_map_display():
       for map_id in map_molecule_list(): 
         set_map_displayed(map_id,1) 
     map_disp_flag_cycle=0
+  _ensure_single_displayed_map_is_scrollable()
 
 #Toggle display of modelling toolbar (assumes it is shown by default)
 toolbar_toggle_var=0
@@ -1659,6 +2778,82 @@ def color_by_ncs_difference_for_active_residue():
     return None
   return color_by_ncs_difference(mol_id)
 
+def color_by_clash_score(mol_id):
+  if mol_id not in model_molecule_list():
+    info_dialog("You need an active model for clash coloring.")
+    return None
+  try:
+    overlap_data=molecule_atom_overlaps(mol_id)
+  except:
+    overlap_data=False
+  if not isinstance(overlap_data, list):
+    info_dialog("No clash data were available for the active molecule.")
+    return None
+
+  blank_colour=0
+  blank_res_list=[]
+  max_overlap_by_residue={}
+
+  for residue_spec in _all_residue_specs_for_colouring(mol_id):
+    blank_res_list.append((residue_spec, blank_colour))
+
+  def accumulate_overlap_from_atom_spec(atom_spec, overlap_value):
+    if not isinstance(atom_spec, list):
+      return
+    try:
+      residue_spec=atom_spec_to_residue_spec(atom_spec)
+    except:
+      return
+    if not isinstance(residue_spec, list) or len(residue_spec) < 3:
+      return
+    residue_key=(residue_spec_to_chain_id(residue_spec),
+                 residue_spec_to_res_no(residue_spec),
+                 residue_spec_to_ins_code(residue_spec))
+    previous_max=max_overlap_by_residue.get(residue_key, 0.0)
+    if overlap_value > previous_max:
+      max_overlap_by_residue[residue_key]=overlap_value
+
+  for overlap_item in overlap_data:
+    if not isinstance(overlap_item, dict):
+      continue
+    try:
+      overlap_value=float(overlap_item.get('overlap-volume', 0.0))
+    except:
+      continue
+    atom_spec_1=overlap_item.get('atom-1-spec')
+    atom_spec_2=overlap_item.get('atom-2-spec')
+    accumulate_overlap_from_atom_spec(atom_spec_1, overlap_value)
+    accumulate_overlap_from_atom_spec(atom_spec_2, overlap_value)
+
+  if not max_overlap_by_residue:
+    info_dialog("No clash data were available for the active molecule.")
+    return None
+
+  clash_colour_list=[]
+  for residue_spec, max_overlap in max_overlap_by_residue.items():
+    normalized_score=max_overlap/2.0
+    if normalized_score < 0.0:
+      normalized_score=0.0
+    if normalized_score > 1.0:
+      normalized_score=1.0
+    colour_index=int(normalized_score*31+2)
+    clash_colour_list.append(([residue_spec[0], residue_spec[1], residue_spec[2]], colour_index))
+
+  try:
+    clear_user_defined_atom_colours(mol_id)
+    set_user_defined_atom_colour_by_residue_py(mol_id, blank_res_list)
+    set_user_defined_atom_colour_by_residue_py(mol_id, clash_colour_list)
+    graphics_to_user_defined_atom_colours_representation(mol_id)
+    info_dialog("Active molecule colored by per-residue maximum clash overlap, in spectral coloring (blue=low clash, red=high clash)")
+  except NameError:
+    info_dialog("You need a newer Coot build for user-defined residue coloring.")
+
+def color_by_clash_score_for_active_molecule():
+  mol_id=_active_molecule_or_status()
+  if mol_id is None:
+    return None
+  return color_by_clash_score(mol_id)
+
 def show_custom_keybindings_summary():
   info_dialog(
     "Custom keybindings\n\n"
@@ -1728,12 +2923,19 @@ def toggle_mol_display():
 
 #Cycle representation mode forward/back
 cycle_rep_flag={0:0}
+def _cycle_rep_flag_or_default(mol_id):
+  flag=cycle_rep_flag.get(mol_id, 0)
+  if flag not in [0,1,2,3,4,5]:
+    cycle_rep_flag[mol_id]=0
+    return 0
+  return flag
+
 def cycle_rep_up_active():
   residue=_active_residue_or_status()
   if not residue:
     return None
   mol_id=residue[0]
-  return cycle_rep_up(mol_id, cycle_rep_flag.get(mol_id,0))
+  return cycle_rep_up(mol_id, _cycle_rep_flag_or_default(mol_id))
 
 def cycle_rep_up(mol_id,flag):
   global cycle_rep_flag
@@ -1755,12 +2957,14 @@ def cycle_rep_up(mol_id,flag):
       graphics_to_user_defined_atom_colours_representation(mol_id)
       cycle_rep_flag[mol_id]=5
     except NameError:
+      graphics_to_bonds_representation(mol_id)
       cycle_rep_flag[mol_id]=0
   elif cycle_rep_flag[mol_id]==5:
     try:
       graphics_to_user_defined_atom_colours_all_atoms_representation(mol_id)
       cycle_rep_flag[mol_id]=0
     except NameError:
+      graphics_to_bonds_representation(mol_id)
       cycle_rep_flag[mol_id]=0
 
 # def add_partial_water():
@@ -1797,12 +3001,14 @@ def cycle_rep_down(mol_id,flag):
       graphics_to_user_defined_atom_colours_all_atoms_representation(mol_id)
       cycle_rep_flag[mol_id]=0
     except NameError:
+      graphics_to_bonds_representation(mol_id)
       cycle_rep_flag[mol_id]=5
   elif cycle_rep_flag[mol_id]==0:
     try:
       graphics_to_user_defined_atom_colours_representation(mol_id)
       cycle_rep_flag[mol_id]=5
     except NameError:
+      graphics_to_bonds_representation(mol_id)
       cycle_rep_flag[mol_id]=5
   elif cycle_rep_flag[mol_id]==5:
     graphics_to_bonds_representation(mol_id)
@@ -1816,7 +3022,7 @@ def cycle_rep_down_active():
   if not residue:
     return None
   mol_id=residue[0]
-  return cycle_rep_down(mol_id, cycle_rep_flag.get(mol_id,0))
+  return cycle_rep_down(mol_id, _cycle_rep_flag_or_default(mol_id))
 
 
 #Refine triple (Paul)
@@ -2472,101 +3678,6 @@ def delete_h_active():
     return None
   delete_hydrogens(mol_id)
   
-#click the start and end point, then fit the gap between them with polyala
-def fit_polyala_gui():
-  def fit_polyala(res1,res2):
-    length=abs(res1[3]-res2[3])-1
-    loop_seq=length*"A"
-    fit_gap(res1[1],res1[2],res1[3],res2[3],loop_seq,1)
-  user_defined_click(2,fit_polyala)
-  
-# Try to rebuild with db_mainchain after fit_gap?
-# def fit_polyala_gui2():
-#   def fit_polyala(res1,res2):
-#     length=abs(res1[3]-res2[3])-1
-#     loop_seq=length*"A"
-#     fit_gap(res1[1],res1[2],res1[3],res2[3],loop_seq,1)
-#     db_mainchain?
-#   user_defined_click(2,fit_polyala)
-
-#Rebuild backbone in selected zone
-def rebuild_backbone_wrapper():
-  def rebuild_backbone(res1,res2):
-    if res1[1]==res2[1] and res1[2]==res2[2]: #if residues in same mol and chain
-      mol_id=res1[1]
-      ch_id=res1[2]
-      resid1=res1[3]
-      resid2=res2[3]
-      if resid1!=resid2:
-        if resid2<resid1:
-          resid1, resid2 = resid2, resid1
-        new_mol_id=db_mainchain(mol_id,ch_id,resid1,resid2,"forwards")
-        accept_regularizement()
-        res1_rsr=first_residue(new_mol_id,ch_id)
-        res2_rsr=last_residue(new_mol_id,ch_id)
-        #need to mutate each residue to appropriate sidechain and kill sidechain
-        #get target seq with aa_code=three_letter_code2single_letter(residue_name(mol_id,ch_id,resnum,ins_code))
-        #mutate_residue_range
-        #delete_sidechain_range
-        target_seq=""
-        for res in range(res1_rsr,res2_rsr+1):
-          aa_code=three_letter_code2single_letter(residue_name(new_mol_id,ch_id,res,""))
-          target_seq=target_seq+aa_code
-        print("target seq:",target_seq)
-        mutate_residue_range(new_mol_id,ch_id,res1_rsr,res2_rsr,target_seq)
-        delete_sidechain_range(new_mol_id,ch_id,res1_rsr,res2_rsr)
-        for res in range(res1_rsr,res2_rsr+1):
-          if residue_name(new_mol_id,ch_id,res,"")=="PRO":
-            target_seq="P"
-            mutate_residue_range(new_mol_id,ch_id,res,res,target_seq)
-        #cut out orginal region and merge in new fragment?
-        refine_zone(new_mol_id,ch_id,res1_rsr,res2_rsr,"")
-        accept_regularizement()
-      else:
-        info_dialog("Sorry, you need at least 2 residues in a zone!")
-    else:
-      info_dialog("Sorry, residues must be in same mol and chain!")
-  user_defined_click(2,rebuild_backbone)
-
-def rebuild_backbone_reverse_wrapper():
-  def rebuild_backbone_reverse(res1):
-    mol_id=res1[1]
-    ch_id=res1[2]
-    resid1=res1[3]
-    segments=segment_list(mol_id)
-    for seg in segments:
-      if (resid1>=seg[2]) and (resid1<=seg[3]) and (ch_id==seg[1]):
-        res_start=seg[2]
-        res_end=seg[3]
-        ch_id=seg[1]
-        turn_off_backup(mol_id)
-        if res_start!=res_end:
-          reverse_direction_of_fragment(mol_id,ch_id,res_start)
-          new_mol_id=db_mainchain(mol_id,ch_id,res_start,res_end,"forwards")
-        accept_regularizement()
-        res1_rsr=first_residue(new_mol_id,ch_id)
-        res2_rsr=last_residue(new_mol_id,ch_id)
-        #need to mutate each residue to appropriate sidechain and kill sidechain
-        #get target seq with aa_code=three_letter_code2single_letter(residue_name(mol_id,ch_id,resnum,ins_code))
-        #mutate_residue_range
-        #delete_sidechain_range
-        target_seq=""
-        for res in range(res1_rsr,res2_rsr+1):
-          aa_code=three_letter_code2single_letter(residue_name(new_mol_id,ch_id,res,""))
-          target_seq=target_seq+aa_code
-        print("target seq:",target_seq)
-        mutate_residue_range(new_mol_id,ch_id,res1_rsr,res2_rsr,target_seq)
-        delete_sidechain_range(new_mol_id,ch_id,res1_rsr,res2_rsr)
-        for res in range(res1_rsr,res2_rsr+1):
-          if residue_name(new_mol_id,ch_id,res,"")=="PRO":
-            target_seq="P"
-            mutate_residue_range(new_mol_id,ch_id,res,res,target_seq)
-        #cut out orginal region and merge in new fragment?
-        delete_residue_range(mol_id,ch_id,res_start,res_end)
-        merge_molecules([new_mol_id],mol_id)
-        turn_off_backup(mol_id)
-  user_defined_click(1,rebuild_backbone_reverse)
-
 def fit_this_segment():
   if (imol_refinement_map()==-1):
     info_dialog("You must set a refinement map!")
@@ -2857,6 +3968,7 @@ def merge_fragments():
   def merge_2_fragments(res1,res2):
     mol_daughter=[res2[1]]
     mol_ref=res1[1]
+    _ensure_non_polymer_restraints_loaded_from_molecule(res2[1])
     merge_molecules(mol_daughter,mol_ref)
     toggle_display_mol(mol_ref)
     toggle_display_mol(mol_ref)
@@ -3354,20 +4466,13 @@ def add_term_shortcut_force():
 def grow_helix():
   def grow_helix_post_click(res1):
     def grow_helix_enter_resn(n):
+      n_res=_positive_int_from_entry(n,"Number of helix residues")
+      if n_res is None:
+        return None
       mol_id=res1[1]
       ch_id=res1[2]
       res_no=res1[3]
-      res_no_0=res_no
-      for i in range(1,(int(n)+1)):
-        res_type="auto"
-        add_terminal_residue_using_phi_psi(mol_id,ch_id,res_no,
-        res_type,-57.82,-47)
-        sort_residues(mol_id)
-        if (res_no==(first_residue_in_seg(mol_id,ch_id,res_no)+1)):
-          res_no=res_no-1
-        elif (res_no==(last_residue_in_seg(mol_id,ch_id,res_no)-1)):
-          res_no=res_no+1
-      set_b_factor_residue_range(mol_id,ch_id,res_no_0,res_no,default_new_atoms_b_factor())
+      _grow_from_selected_terminus(mol_id,ch_id,res_no,n_res,-57.82,-47,1)
     generic_single_entry("How many residues for helix?",
     "10","Grow helix",grow_helix_enter_resn)
   user_defined_click(1,grow_helix_post_click)
@@ -3376,20 +4481,13 @@ def grow_helix():
 def grow_strand():
   def grow_strand_post_click(res1):
     def grow_strand_enter_resn(n):
+      n_res=_positive_int_from_entry(n,"Number of strand residues")
+      if n_res is None:
+        return None
       mol_id=res1[1]
       ch_id=res1[2]
       res_no=res1[3]
-      res_no_0=res_no
-      for i in range(1,(int(n)+1)):
-        res_type="auto"
-        add_terminal_residue_using_phi_psi(mol_id,ch_id,res_no,
-        res_type,-139,135)
-        sort_residues(mol_id)
-        if (res_no==(first_residue_in_seg(mol_id,ch_id,res_no)+1)):
-          res_no=res_no-1
-        elif (res_no==(last_residue_in_seg(mol_id,ch_id,res_no)-1)):
-          res_no=res_no+1
-      set_b_factor_residue_range(mol_id,ch_id,res_no_0,res_no,default_new_atoms_b_factor())
+      _grow_from_selected_terminus(mol_id,ch_id,res_no,n_res,-139,135,1)
     generic_single_entry("How many residues for strand?",
     "10","Grow strand",grow_strand_enter_resn)
   user_defined_click(1,grow_strand_post_click)
@@ -3398,18 +4496,13 @@ def grow_strand():
 def grow_parallel_strand():
   def grow_parallel_strand_post_click(res1):
     def grow_parallel_strand_enter_resn(n):
+      n_res=_positive_int_from_entry(n,"Number of parallel-strand residues")
+      if n_res is None:
+        return None
       mol_id=res1[1]
       ch_id=res1[2]
       res_no=res1[3]
-      for i in range(1,(int(n)+1)):
-        res_type="auto"
-        add_terminal_residue_using_phi_psi(mol_id,ch_id,res_no,
-        res_type,-119,113)
-        sort_residues(mol_id)
-        if (res_no==(first_residue_in_seg(mol_id,ch_id,res_no)+1)):
-          res_no=res_no-1
-        elif (res_no==(last_residue_in_seg(mol_id,ch_id,res_no)-1)):
-          res_no=res_no+1
+      _grow_from_selected_terminus(mol_id,ch_id,res_no,n_res,-119,113,0)
     generic_single_entry("How many residues for parallel strand?",
     "10","Grow parallel strand",grow_parallel_strand_enter_resn)
   user_defined_click(1,grow_parallel_strand_post_click)
@@ -3418,18 +4511,13 @@ def grow_parallel_strand():
 def grow_helix_3_10():
   def grow_helix_post_click(res1):
     def grow_helix_enter_resn(n):
+      n_res=_positive_int_from_entry(n,"Number of 3-10 helix residues")
+      if n_res is None:
+        return None
       mol_id=res1[1]
       ch_id=res1[2]
       res_no=res1[3]
-      for i in range(1,(int(n)+1)):
-        res_type="auto"
-        add_terminal_residue_using_phi_psi(mol_id,ch_id,res_no,
-        res_type,-49,-26)
-        sort_residues(mol_id)
-        if (res_no==(first_residue_in_seg(mol_id,ch_id,res_no)+1)):
-          res_no=res_no-1
-        elif (res_no==(last_residue_in_seg(mol_id,ch_id,res_no)-1)):
-          res_no=res_no+1
+      _grow_from_selected_terminus(mol_id,ch_id,res_no,n_res,-49,-26,0)
     generic_single_entry("How many residues for helix?",
     "10","Grow 3-10 helix",grow_helix_enter_resn)
   user_defined_click(1,grow_helix_post_click)
@@ -3599,7 +4687,9 @@ def mutate_all_mse_to_met():
   
 #Shorten loop by one residue
 def shorten_loop():
-  active_atom=active_residue()
+  active_atom=_active_residue_or_status()
+  if not active_atom:
+    return None
   mol_id=active_atom[0]
   ch_id=active_atom[1]
   resn=active_atom[2]
@@ -3613,12 +4703,15 @@ def shorten_loop():
   r1=resn-1
   r2=resn+2
   set_refinement_immediate_replacement(1)
-  refine_zone(mol_id,ch_id,r1,r2,"")
-  accept_regularizement()
-  set_refinement_immediate_replacement(0)
+  try:
+    refine_zone(mol_id,ch_id,r1,r2,"")
+    accept_regularizement()
+  finally:
+    set_refinement_immediate_replacement(0)
 
 #Lengthen loop by one residue
 def lengthen_loop():
+  _patch_gap_low_density_average()
   active_atom=active_residue()
   mol_id=active_atom[0]
   ch_id=active_atom[1]
@@ -3637,11 +4730,17 @@ def lengthen_loop():
 
 #Get fractional coordinates of active atom. Useful when inspecting heavy atom sites.
 def get_fract_coords():
-  a=active_residue()
-  x_cart=atom_specs(a[0],a[1],a[2],a[3],a[4],a[5])[3]
-  y_cart=atom_specs(a[0],a[1],a[2],a[3],a[4],a[5])[4]
-  z_cart=atom_specs(a[0],a[1],a[2],a[3],a[4],a[5])[5]
-  mol_id=active_residue()[0]
+  a=_active_residue_or_status()
+  if not a:
+    return None
+  atom_info=atom_specs(a[0],a[1],a[2],a[3],a[4],a[5])
+  if not atom_info:
+    info_dialog("Unable to obtain the active atom coordinates.")
+    return None
+  x_cart=atom_info[3]
+  y_cart=atom_info[4]
+  z_cart=atom_info[5]
+  mol_id=a[0]
   cell_a=cell(mol_id)[0]
   cell_b=cell(mol_id)[1]
   cell_c=cell(mol_id)[2]
@@ -3690,10 +4789,10 @@ def pick_common_monomers():
   get_pe=["PE (lipid)", lambda func: get_monomer_no_H("PEF")]
   get_pc=["PC (lipid)", lambda func: get_monomer_no_H("PLC")]
   get_ps=["PS (lipid)", lambda func: get_monomer_no_H("PSF")]
-  get_ps=["PI(3,4)P2 (lipid)", lambda func: get_monomer_no_H("52N")]
+  get_pip2=["PI(3,4)P2 (lipid)", lambda func: get_monomer_no_H("52N")]
   get_chs=["Cholesterol hemisuccinate", lambda func: get_monomer_no_H("Y01")]
   get_chl=["Cholesterol", lambda func: get_monomer_no_H("CLR")]
-  button_list=[get_acetate,get_eg,get_glycerol,get_dmso,get_ddm,get_dm,get_bog,get_ldao,get_mpg,get_tris,get_hepes,get_mes,get_cac,get_peg,get_popg,get_pe,get_pc,get_ps,get_chs,get_chl]
+  button_list=[get_acetate,get_eg,get_glycerol,get_dmso,get_ddm,get_dm,get_bog,get_ldao,get_mpg,get_tris,get_hepes,get_mes,get_cac,get_peg,get_popg,get_pe,get_pc,get_ps,get_pip2,get_chs,get_chl]
   generic_button_dialog("Common small molecules",button_list)
   
 #Switch all models to CA representation
@@ -4380,7 +5479,10 @@ def clear_dots():
 #Make an alkyl chain of entered length and autofit to map if available
 def make_alkyl_chain():
   def make_alkyl_chain_length_n(n):
-    smiles_string=int(int(n)+1)*"c"
+    n_carbons=_positive_int_from_entry(n,"Number of carbons")
+    if n_carbons is None:
+      return None
+    smiles_string=int(n_carbons+1)*"c"
     new_molecule_by_smiles_string("",smiles_string,force_libcheck=True)
     delete_hydrogens(molecule_number_list()[-1])
     mol_id=molecule_number_list()[-1]
@@ -4426,6 +5528,9 @@ def place_helix_with_restraints():
 #Make new helix (don't fit)
 def place_new_helix():
   def place_new_helix_entry(n):
+    n_res=_positive_int_from_entry(n,"Number of helix residues")
+    if n_res is None:
+      return None
     get_monomer_no_H("ALA")
     mol_id=model_molecule_list()[-1]
     ch_id=chain_ids(mol_id)[0]
@@ -4434,7 +5539,7 @@ def place_new_helix():
     altloc=""
     delete_atom(mol_id,ch_id,1,ins_code," OXT",altloc)
     res_type="auto"
-    for i in range(1,int(n)):
+    for i in range(1,n_res):
       add_terminal_residue_using_phi_psi(mol_id,ch_id,res_no,
       res_type,-57.82,-47)
       res_no=res_no+1
@@ -4444,6 +5549,9 @@ def place_new_helix():
 #Make new strand (don't fit)
 def place_new_strand():
   def place_new_strand_entry(n):
+    n_res=_positive_int_from_entry(n,"Number of strand residues")
+    if n_res is None:
+      return None
     get_monomer_no_H("ALA")
     mol_id=model_molecule_list()[-1]
     ch_id=chain_ids(mol_id)[0]
@@ -4452,7 +5560,7 @@ def place_new_strand():
     altloc=""
     delete_atom(mol_id,ch_id,1,ins_code," OXT",altloc)
     res_type="auto"
-    for i in range(1,int(n)):
+    for i in range(1,n_res):
       add_terminal_residue_using_phi_psi(mol_id,ch_id,res_no,
       res_type,-139,135)
       res_no=res_no+1
@@ -4462,6 +5570,9 @@ def place_new_strand():
 #Make new 3-10 helix (don't fit)
 def place_new_3_10_helix():
   def place_new_3_10_helix_entry(n):
+    n_res=_positive_int_from_entry(n,"Number of 3-10 helix residues")
+    if n_res is None:
+      return None
     get_monomer_no_H("ALA")
     mol_id=model_molecule_list()[-1]
     ch_id=chain_ids(mol_id)[0]
@@ -4470,7 +5581,7 @@ def place_new_3_10_helix():
     altloc=""
     delete_atom(mol_id,ch_id,1,ins_code," OXT",altloc)
     res_type="auto"
-    for i in range(1,int(n)):
+    for i in range(1,n_res):
       add_terminal_residue_using_phi_psi(mol_id,ch_id,res_no,
       res_type,-49,-26)
       res_no=res_no+1
@@ -4662,6 +5773,81 @@ def add_term_shortcut_force_strand():
     sort_residues(mol_id)
     set_go_to_atom_chain_residue_atom_name(ch_id,last_in_seg+1,atom_name)
 
+def _growth_terminus_state(mol_id, ch_id, res_no):
+  first_in_seg=first_residue_in_seg(mol_id,ch_id,res_no)
+  last_in_seg=last_residue_in_seg(mol_id,ch_id,res_no)
+  delta_first=abs(first_in_seg-res_no)
+  delta_last=abs(last_in_seg-res_no)
+  if delta_first<=delta_last:
+    return [first_in_seg, -1]
+  return [last_in_seg, 1]
+
+def _grow_from_selected_terminus(mol_id, ch_id, clicked_res_no, n_res, phi, psi, b_factor_range_qm=0):
+  [res_no, step_direction]=_growth_terminus_state(mol_id,ch_id,clicked_res_no)
+  res_no_0=res_no
+
+  if step_direction == 1:
+    current_term_res_no=last_residue_in_seg(mol_id,ch_id,res_no)
+  else:
+    current_term_res_no=first_residue_in_seg(mol_id,ch_id,res_no)
+
+  requested_start=current_term_res_no+step_direction
+  requested_end=current_term_res_no+(step_direction*n_res)
+  requested_min=min(requested_start, requested_end)
+  requested_max=max(requested_start, requested_end)
+
+  if step_direction == 1:
+    for seg in segment_list_chain(mol_id,ch_id):
+      seg_start=seg[2]
+      seg_end=seg[3]
+      if (seg_start > current_term_res_no) and not ((requested_max < seg_start) or (requested_min > seg_end)):
+        info_dialog("Requested growth would overlap the next polymer segment.\n\nPlease renumber or move the later segment first.")
+        return 0
+  else:
+    for seg in segment_list_chain(mol_id,ch_id):
+      seg_start=seg[2]
+      seg_end=seg[3]
+      if (seg_end < current_term_res_no) and not ((requested_max < seg_start) or (requested_min > seg_end)):
+        info_dialog("Requested growth would overlap the previous polymer segment.\n\nPlease renumber or move the earlier segment first.")
+        return 0
+
+  added_count=0
+  for i in range(1,(n_res+1)):
+    if step_direction == 1:
+      res_no=last_residue_in_seg(mol_id,ch_id,res_no)
+    else:
+      res_no=first_residue_in_seg(mol_id,ch_id,res_no)
+    target_res_no=res_no+step_direction
+    if residue_exists_qm(mol_id,ch_id,target_res_no,""):
+      if (step_direction == 1) and (not _residue_is_polymer(mol_id, ch_id, target_res_no, "")):
+        remaining_growth=(n_res - added_count)
+        renumber_offset=remaining_growth + 1
+        renumber_residue_range(mol_id,ch_id,target_res_no,last_residue(mol_id,ch_id),renumber_offset)
+        sort_residues(mol_id)
+        if step_direction == 1:
+          res_no=last_residue_in_seg(mol_id,ch_id,res_no)
+        else:
+          res_no=first_residue_in_seg(mol_id,ch_id,res_no)
+        target_res_no=res_no+step_direction
+      else:
+        _status_message("Stopped growth before overlapping adjacent segment numbering")
+        break
+    res_type="auto"
+    add_terminal_residue_using_phi_psi(mol_id,ch_id,res_no,res_type,phi,psi)
+    sort_residues(mol_id)
+    if step_direction == 1:
+      new_res_no=last_residue_in_seg(mol_id,ch_id,res_no)
+    else:
+      new_res_no=first_residue_in_seg(mol_id,ch_id,res_no)
+    if new_res_no == res_no:
+      _status_message("Stopped growth because Coot could not add the next terminal residue")
+      break
+    res_no=new_res_no
+    added_count=added_count+1
+  if b_factor_range_qm and added_count>0:
+    set_b_factor_residue_range(mol_id,ch_id,min(res_no_0,res_no),max(res_no_0,res_no),default_new_atoms_b_factor())
+  return added_count
+
 #Add h-bond restraints to active mol with Prosmart
 def run_prosmart_self():
   """
@@ -4748,23 +5934,88 @@ def return_seq_as_string(mol_id,ch_id):
     seq=seq+aa_code
   return seq
 
+def _compile_sequence_pattern(subseq):
+  pattern=[]
+  index=0
+  while index < len(subseq):
+    character=subseq[index]
+    if character=="(":
+      close_index=subseq.find(")", index+1)
+      if close_index==-1:
+        raise ValueError("Unmatched '(' in sequence pattern")
+      option_text=subseq[index+1:close_index]
+      if not option_text:
+        raise ValueError("Empty bracketed option in sequence pattern")
+      options=[piece.strip().upper() for piece in option_text.split("/") if piece.strip()]
+      if not options:
+        raise ValueError("Empty bracketed option in sequence pattern")
+      allowed=set()
+      for option in options:
+        if len(option)!=1:
+          raise ValueError("Bracketed options must be single-letter residues")
+        allowed.add(option)
+      pattern.append(("set", allowed))
+      index=close_index+1
+      continue
+    if character=="X":
+      pattern.append(("any", None))
+    else:
+      pattern.append(("set", set([character])))
+    index=index+1
+  if not pattern:
+    raise ValueError("Empty sequence pattern")
+  return pattern
+
+def _sequence_pattern_matches_at(seq, start_index, compiled_pattern):
+  if start_index+len(compiled_pattern) > len(seq):
+    return False
+  for offset in range(len(compiled_pattern)):
+    mode, allowed=compiled_pattern[offset]
+    seq_char=seq[start_index+offset]
+    if mode=="any":
+      continue
+    if seq_char not in allowed:
+      return False
+  return True
+
+def _sequence_match_context_label(ch_id, seq, sn_start, pattern_length, mol_id):
+  sn_end=sn_start+pattern_length-1
+  resno_start=seqnum_from_serial_number(mol_id,ch_id,sn_start)
+  resno_end=seqnum_from_serial_number(mol_id,ch_id,sn_end)
+  left_context_start=max(0, sn_start-3)
+  right_context_end=min(len(seq), sn_start+pattern_length+3)
+  left_context=seq[left_context_start:sn_start]
+  match_context=seq[sn_start:sn_start+pattern_length]
+  right_context=seq[sn_start+pattern_length:right_context_end]
+  if left_context_start>0:
+    left_context="..."+left_context
+  if right_context_end<len(seq):
+    right_context=right_context+"..."
+  return "%s%d-%d: %s*%s*%s" %(ch_id,resno_start,resno_end,left_context,match_context,right_context)
+
 def find_sequence_in_current_chain(subseq):
   subseq=subseq.upper()
-  mol_id=active_residue()[0]
-  ch_id=active_residue()[1]
+  residue=_active_residue_or_status()
+  if not residue:
+    return None
+  mol_id=residue[0]
+  ch_id=residue[1]
   seq=return_seq_as_string(mol_id,ch_id)
-  index=0
+  try:
+    compiled_pattern=_compile_sequence_pattern(subseq)
+  except ValueError, e:
+    info_dialog(str(e))
+    return None
   sn_list=[]
   interesting_list=[]
-  while index < len(seq):
-    try:
-      index=seq.index(subseq,index)
-    except ValueError:
-      break
-    sn_list.append(index)
-    if index==-1:
-      break
-    index=index+len(subseq)
+  pattern_length=len(compiled_pattern)
+  index=0
+  while index <= len(seq)-pattern_length:
+    if _sequence_pattern_matches_at(seq, index, compiled_pattern):
+      sn_list.append(index)
+      index=index+pattern_length
+    else:
+      index=index+1
   if len(sn_list)==1:
     sn_start=sn_list[0]
     resno=seqnum_from_serial_number(mol_id,ch_id,sn_start)
@@ -4798,14 +6049,14 @@ def find_sequence_in_current_chain(subseq):
         x=atom_specs(mol_id,ch_id,resno,ins_code,"P",alt_conf)[-3]
         y=atom_specs(mol_id,ch_id,resno,ins_code,"P",alt_conf)[-2]
         z=atom_specs(mol_id,ch_id,resno,ins_code,"P",alt_conf)[-1]
-      list_entry=[str(resno),x,y,z]
+      list_entry=[_sequence_match_context_label(ch_id,seq,sn,pattern_length,mol_id),x,y,z]
       interesting_list.append(list_entry)
       print("interesting list",interesting_list)
     print("interesting list",interesting_list)
     interesting_things_gui("Matches to entered sequence",interesting_list)
 
 def find_sequence_with_entry():
-  generic_single_entry("Enter sequence fragment to find",
+  generic_single_entry("Enter sequence fragment to find\n(X=wildcard, (A/S)=either residue)",
   "MAAAA","Find sequence in active chain",find_sequence_in_current_chain)
 
       
@@ -4953,6 +6204,9 @@ add_simple_coot_menu_menuitem(submenu_display, "All Molecules use \"C-alpha\" Sy
 add_simple_coot_menu_menuitem(submenu_display, "Toggle Symmetry", 
 lambda func: set_show_symmetry_master(not get_show_symmetry()))
 
+add_simple_coot_menu_menuitem(submenu_display, "Load molecular symmetry copies from file metadata",
+lambda func: _load_display_molecular_symmetry_from_metadata())
+
 add_simple_coot_menu_menuitem(submenu_display, "Clear labels and distances", 
 lambda func: clear_distances_and_labels())
 
@@ -4995,6 +6249,9 @@ add_simple_coot_menu_menuitem(submenu_colour,
 add_simple_coot_menu_menuitem(submenu_colour,
 "Color active mol by NCS difference", lambda func: color_by_ncs_difference_for_active_residue())
 
+add_simple_coot_menu_menuitem(submenu_colour,
+"Color active mol by clash score", lambda func: color_by_clash_score_for_active_molecule())
+
 add_simple_coot_menu_menuitem(submenu_colour, "Highlight chain breaks in active mol", lambda func: highlight_chain_breaks())
 
 add_simple_coot_menu_menuitem(submenu_colour, "Highlight chain breaks in all mols", lambda func: highlight_all_chain_breaks())
@@ -5016,21 +6273,6 @@ lambda func: stepped_sphere_refine_active_chain())
 
 add_simple_coot_menu_menuitem(submenu_fit, "Fit current chain to map", 
 lambda func: rigid_fit_active_chain())
-
-add_simple_coot_menu_menuitem(submenu_fit, 
-"Jiggle-fit current chain to map (Slow!)", lambda func: jiggle_fit_active_chain())
-
-add_simple_coot_menu_menuitem(submenu_fit,
-"Jiggle-fit current chain to B-smoothed map (Slow!)", lambda func: jiggle_fit_active_chain_smooth())
-
-add_simple_coot_menu_menuitem(submenu_fit, "Jiggle-fit all chains to map (very slow!)",
-lambda func: jiggle_fit_all_chains())
-
-add_simple_coot_menu_menuitem(submenu_fit, 
-"Jiggle-fit current mol to map (Slow!)", lambda func: jiggle_fit_active_mol())
-
-add_simple_coot_menu_menuitem(submenu_fit, 
-"Fit polyala loop (click start and end)", lambda func: fit_polyala_gui())
 
 add_simple_coot_menu_menuitem(submenu_fit, "Fit all segments", lambda func: rigid_body_fit_segments())
 
@@ -5114,14 +6356,6 @@ add_simple_coot_menu_menuitem(submenu_build, "Make alkyl chain of length n", lam
 add_simple_coot_menu_menuitem(submenu_build, "Make alpha helix of length n", lambda func: place_new_helix()) 
 
 add_simple_coot_menu_menuitem(submenu_build, "Make 3-10 helix of length n", lambda func: place_new_3_10_helix())
-
-add_simple_coot_menu_menuitem(submenu_build, "Rebuild backbone (click start,end)", lambda func: rebuild_backbone_wrapper())
-
-add_simple_coot_menu_menuitem(submenu_build, "Rebuild and reverse backbone of segment (click segment)", lambda func: rebuild_backbone_reverse_wrapper())
-
-
-
-
 
 #"Mutate...
 
